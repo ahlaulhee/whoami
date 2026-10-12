@@ -1,0 +1,159 @@
+@import './tokens.css';
+
+@font-face {
+  font-family: 'Departure Mono';
+  src: url('/fonts/DepartureMono-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+
+:root {
+  --line: 1.65em;
+  color-scheme: dark;
+  scrollbar-color: #2a2925 var(--bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.65 'Departure Mono', ui-monospace, Consolas, monospace;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+::selection {
+  background: var(--amber);
+  color: var(--bg);
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--amber);
+}
+
+a:focus-visible {
+  outline: 1px dashed var(--amber);
+  outline-offset: 3px;
+  color: var(--amber);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.page {
+  max-width: calc(640px + 12vw);
+  padding: 8vh 6vw 10vh;
+}
+
+h1 {
+  margin: 0;
+}
+
+.banner {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.banner text {
+  font-family: 'Departure Mono', ui-monospace, monospace;
+  font-weight: bold;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.who {
+  margin: 18px 0 36px;
+  color: var(--muted);
+}
+
+.box {
+  position: relative;
+  margin-bottom: 20px;
+  padding: 0 3ch;
+}
+
+.box::before,
+.box::after {
+  content: '#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#\A#';
+  position: absolute;
+  top: var(--line);
+  bottom: var(--line);
+  overflow: hidden;
+  white-space: pre;
+  color: var(--muted);
+}
+
+.box::before { left: 0; }
+.box::after { right: 0; }
+
+.box-top,
+.box-bottom {
+  display: flex;
+  margin: 0 -3ch;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.box-top h2 {
+  margin: 0;
+  padding: 0 0.5ch;
+  font: inherit;
+  color: var(--amber);
+}
+
+.fill {
+  flex: 1;
+  overflow: hidden;
+}
+
+.fill::before {
+  content: '================================================================================================================================================';
+}
+
+.box-body {
+  margin: 0;
+  padding: 10px 0 6px;
+}
+
+.box-body p {
+  margin: 0 0 0.8em;
+}
+
+.entries {
+  list-style: none;
+}
+
+.entries li {
+  margin: 0 0 0.8em;
+}
+
+.note {
+  display: block;
+  color: var(--muted);
+}
+
+.entries.inline .note {
+  display: inline;
+  margin-left: 1ch;
+}

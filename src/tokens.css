@@ -1,0 +1,13 @@
+:root {
+  --bg: #0b0b0d;
+  --fg: #d9d4c7;
+  --muted: #8a857a;
+  --amber: #ffb454;
+  --magenta: #ff6ac1;
+  --cyan: #5ccfe6;
+}
+
+.q8 { font-size: 9.6px; fill: var(--cyan); }
+.q16 { font-size: 19.2px; fill: var(--magenta); }
+.q32 { font-size: 38.4px; fill: var(--amber); }
+.q64 { font-size: 76.8px; fill: var(--amber); }
