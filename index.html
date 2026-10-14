@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ahlaulhee · Alex Laulhe</title>
-    <meta name="description" content="I'm Alex, 26. I've been working as a fullstack developer for three years." />
+    <meta name="description" content="I'm Alex, {{age}}. I've been working as a fullstack developer for {{tenure}}." />
     <meta name="author" content="Alex Laulhe" />
     <meta name="theme-color" content="#0b0b0d" />
     <link rel="canonical" href="https://ahlaulhee.pages.dev/" />
@@ -13,13 +13,14 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://ahlaulhee.pages.dev/" />
     <meta property="og:title" content="ahlaulhee · Alex Laulhe" />
-    <meta property="og:description" content="I'm Alex, 26. I've been working as a fullstack developer for three years." />
+    <meta property="og:description" content="I'm Alex, {{age}}. I've been working as a fullstack developer for {{tenure}}." />
     <meta property="og:image" content="https://ahlaulhee.pages.dev/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" href="/fonts/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/style.css" />
+    <script type="module" src="/src/main.js"></script>
   </head>
   <body>
     <main class="page">
@@ -31,7 +32,7 @@
       <section class="box" aria-labelledby="about">
         <div class="box-top"><span aria-hidden="true">#==[</span><h2 id="about">about</h2><span aria-hidden="true">]</span><span class="fill" aria-hidden="true"></span><span aria-hidden="true">#</span></div>
         <div class="box-body">
-          <p>I'm Alex, 26. I've been working as a fullstack developer for three years.</p>
+          <p>I'm Alex, <span data-calc="age">{{age}}</span>. I've been working as a fullstack developer for <span data-calc="tenure">{{tenure}}</span>.</p>
           <p>Outside of work I make side projects, mostly related to video games.</p>
         </div>
         <div class="box-bottom" aria-hidden="true">#<span class="fill"></span>#</div>
