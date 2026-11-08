@@ -38,11 +38,13 @@ Everything in this guide lives in one git repository, `~/dotfiles`. Each program
 ├── bin/dwl-session                    # copied to /usr/local/bin
 ├── dwl/                               # dwl source tree (git subtree)
 ├── slstatus/                          # slstatus source tree (git subtree)
+├── fonts/.local/share/fonts/maple-mono/
 ├── foot/.config/foot/foot.ini
 ├── kanshi/.config/kanshi/config
 ├── mako/.config/mako/config
-├── swaylock/.config/swaylock/config
 ├── portal/.config/xdg-desktop-portal/wlroots-portals.conf
+├── swaylock/.config/swaylock/config
+├── xdpw/.config/xdg-desktop-portal-wlr/config
 └── zathura/.config/zathura/zathurarc
 ```
 
@@ -55,7 +57,7 @@ git commit --allow-empty -m "Start dotfiles"
 Once the config files exist, link them into your home directory by naming the folders:
 
 ```bash
-stow --no-folding -d ~/dotfiles -t ~ foot kanshi mako portal swaylock zathura
+stow --no-folding -d ~/dotfiles -t ~ fonts foot kanshi mako portal swaylock xdpw zathura
 ```
 
 Without `--no-folding`, Stow links whole directories when it can, so `~/.config/foot` itself would point into the repo, and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files.
@@ -133,7 +135,7 @@ These are the parts I change. The colors are the [Paradise](https://github.com/p
 
 ```c title="dwl/config.h"
 static const unsigned int borderpx         = 2;  /* border pixel of windows */
-static const char *fonts[]                 = {"Geist Mono:size=11"};
+static const char *fonts[]                 = {"Maple Mono:size=11"};
 static const float rootcolor[]             = COLOR(0x151515ff);
 static uint32_t colors[][3]                = {
 	/*               fg          bg          border    */
@@ -153,7 +155,7 @@ static const char *const autostart[] = {
 	"mako", NULL,
 	"/usr/libexec/lxqt-policykit-agent", NULL,
 	"wl-paste", "--watch", "cliphist", "store", NULL,
-	"swayidle", "-w", "timeout", "600", "swaylock -f", "before-sleep", "swaylock -f", NULL,
+	"swayidle", "-w", "timeout", "600", "swaylock -f", "timeout", "900", "wlopm --off '*'", "resume", "wlopm --on '*'", "before-sleep", "swaylock -f", NULL,
 	NULL /* terminate */
 };
 ```
@@ -183,7 +185,7 @@ Then the commands and the bindings I add on top of dwl's defaults:
 
 ```c title="dwl/config.h"
 static const char *termcmd[] = { "foot", NULL };
-static const char *menucmd[] = { "wmenu-run", "-f", "Geist Mono 11",
+static const char *menucmd[] = { "wmenu-run", "-f", "Maple Mono 11",
 	"-N", "151515", "-n", "a39d9d", "-M", "151515", "-m", "8da3b9", "-S", "e8e3e3", "-s", "151515", NULL };
 static const char *lockcmd[] = { "swaylock", "-f", NULL };
 static const char *filescmd[] = { "foot", "-e", "nnn", NULL };
@@ -192,7 +194,7 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_p,      spawn, {.v = menucmd} },
 	{ MODKEY,                    XKB_KEY_n,      spawn, {.v = filescmd} },
 	{ MODKEY,                    XKB_KEY_Escape, spawn, {.v = lockcmd} },
-	{ MODKEY,                    XKB_KEY_v,      spawn, SHCMD("cliphist list | wmenu -l 10 -f 'Geist Mono 11' | cliphist decode | wl-copy") },
+	{ MODKEY,                    XKB_KEY_v,      spawn, SHCMD("cliphist list | wmenu -l 10 -f 'Maple Mono 11' | cliphist decode | wl-copy") },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_s,      spawn, SHCMD("grim -g \"$(slurp)\" - | wl-copy") },
 	{ 0,                         XKB_KEY_Print,  spawn, SHCMD("grim \"$HOME/Pictures/$(date +%F_%H-%M-%S).png\"") },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_x,      spawn, SHCMD("grimpicker --copy --notify") },
@@ -379,7 +381,7 @@ sudo dnf install foot wmenu swaybg mako libnotify swaylock swayidle \
   wl-clipboard cliphist grim slurp grimpicker \
   xdg-desktop-portal-wlr xdg-desktop-portal-gtk lxqt-policykit xdg-user-dirs \
   nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui \
-  vercel-geist-fonts vercel-geist-mono-fonts google-noto-color-emoji-fonts dbus-tools
+  wlopm google-noto-color-emoji-fonts dbus-tools
 xdg-user-dirs-update
 ```
 
@@ -389,7 +391,7 @@ xdg-user-dirs-update
 | `wmenu` | launcher; `wmenu-run` lists everything in `$PATH` |
 | `swaybg` | background |
 | `mako`, `libnotify` | notifications, and `notify-send` to test them |
-| `swaylock`, `swayidle` | lock screen and locking after ten minutes idle |
+| `swaylock`, `swayidle`, `wlopm` | lock screen after ten minutes idle, monitors off after fifteen |
 | `wl-clipboard`, `cliphist` | `wl-copy`/`wl-paste` (Neovim uses them for the system clipboard) and the clipboard history behind Super+v |
 | `grim`, `slurp` | screenshots, whole screen or a selected region |
 | `grimpicker` | color picker; Fedora builds it from sway-contrib as its own package, without sway |
@@ -397,11 +399,45 @@ xdg-user-dirs-update
 | `lxqt-policykit` | password prompts for programs that ask polkit for privileges |
 | `nnn`, `zathura`, `imv`, `mpv` | files, PDFs, images, video |
 | `NetworkManager-tui` | `nmtui`, a menu for Wi-Fi and network connections |
-| `vercel-geist-*-fonts` | Geist and Geist Mono, the fonts of this site, used in the bar, the terminal and the launcher |
 
 PipeWire and WirePlumber came with `@multimedia` in part 1. `wpctl`, from WirePlumber, is what the volume keys call.
 
 `xdg-user-dirs-update` creates `~/Pictures` and the other standard folders; the Print binding saves there.
+
+`wlopm` turns the monitors off through the output power protocol, which dwl implements. `wlr-randr --off` looks similar, but dwl treats it as an unplugged monitor and moves its windows to the other screen.
+
+### Screen sharing
+
+When a browser, Discord or OBS asks to share the screen, xdg-desktop-portal-wlr needs a way to ask you which monitor or window. I use wmenu for that, and cap the stream at 60 fps so the 240 Hz monitor doesn't send four times what a video call can use:
+
+```ini title="~/dotfiles/xdpw/.config/xdg-desktop-portal-wlr/config"
+[screencast]
+max_fps=60
+chooser_type=dmenu
+chooser_cmd=wmenu -p 'Share:' -l 10 -f 'Maple Mono 11'
+```
+
+Restart the portal after changing it: `systemctl --user restart xdg-desktop-portal-wlr`.
+
+Fedora 45 ships xdg-desktop-portal-wlr 0.8.4, which has two open regressions: the stream freezing after the first frame ([#411](https://github.com/emersion/xdg-desktop-portal-wlr/issues/411)) and sharing failing with "No supported targets specified" ([#409](https://github.com/emersion/xdg-desktop-portal-wlr/issues/409)). Both reports say 0.8.2 works. If you hit one, those issues are where fixes and workarounds show up.
+
+## A font for the desktop
+
+The site uses Geist, but on the desktop I use [Maple Mono](https://github.com/subframe7536/maple-font): rounded, with a cursive italic, under the OFL license. It isn't packaged in Fedora, so it goes into the dotfiles as a Stow package. The `TTF` archive has the static weights; check it against the published checksum before unpacking:
+
+```bash
+mkdir -p ~/dotfiles/fonts/.local/share/fonts/maple-mono
+cd /tmp
+curl -LO https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-TTF.zip
+curl -LO https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-TTF.sha256
+echo "$(cat MapleMono-TTF.sha256)  MapleMono-TTF.zip" | sha256sum -c
+unzip MapleMono-TTF.zip -d ~/dotfiles/fonts/.local/share/fonts/maple-mono
+stow --no-folding -d ~/dotfiles -t ~ fonts
+fc-cache -f
+fc-match "Maple Mono"
+```
+
+The last command should print `MapleMono-Regular.ttf: "Maple Mono" "Regular"`. The bar, foot, wmenu, mako and swaylock all find it by that name through fontconfig. In foot the cursive italic shows up, but the ligatures don't: `->` and `!=` stay as separate characters.
 
 ## Paradise everywhere
 
@@ -411,7 +447,7 @@ foot 1.28 calls the color section `colors-dark`:
 
 ```ini title="~/dotfiles/foot/.config/foot/foot.ini"
 [main]
-font=Geist Mono:size=12
+font=Maple Mono:size=12
 pad=12x12
 
 [cursor]
@@ -441,7 +477,7 @@ bright7=e8e3e3
 `foot --check-config` validates the file.
 
 ```ini title="~/dotfiles/mako/.config/mako/config"
-font=Geist Mono 11
+font=Maple Mono 11
 background-color=#151515
 text-color=#e8e3e3
 border-color=#424242
@@ -465,9 +501,10 @@ ring-ver-color=d9bc8c
 ring-wrong-color=b66467
 text-color=e8e3e3
 indicator-radius=80
+font=Maple Mono
 ```
 
-For zathura I use the [Paradise zathurarc](https://github.com/paradise-theme/paradise/blob/main/cfg/zathura/zathurarc) as it is, with the font line changed to `set font "Geist Mono 11"`.
+For zathura I use the [Paradise zathurarc](https://github.com/paradise-theme/paradise/blob/main/cfg/zathura/zathurarc) as it is, with the font line changed to `set font "Maple Mono 11"`.
 
 ## Gaming
 
