@@ -1,0 +1,52 @@
+---
+import { getTags, tagHref } from '../lib/posts';
+import Icon from './Icon.astro';
+
+interface Props {
+  current?: string;
+}
+
+const { current } = Astro.props;
+const tags = await getTags();
+---
+
+<section class="panel" aria-labelledby="tags-title">
+  <h2 class="panel-title" id="tags-title"><Icon name="lucide:tag" />Tags</h2>
+  <ul class="tags">
+    {
+      [...tags].map(([tag, posts]) => (
+        <li>
+          <a class="tag" href={tagHref(tag)} aria-current={tag === current ? 'page' : undefined}>
+            {tag}
+          </a>
+          <span class="meta">{posts.length}</span>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .tags {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .tags li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .tag[aria-current='page'] {
+    background: var(--fg);
+    color: var(--panel);
+    padding-inline: 0.25rem;
+  }
+
+  .tag[aria-current='page']::before {
+    color: inherit;
+  }
+</style>

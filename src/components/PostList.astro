@@ -1,0 +1,49 @@
+---
+import { formatDate, type Post, postHref, tagHref } from '../lib/posts';
+
+interface Props {
+  posts: Post[];
+  headingLevel?: 'h2' | 'h3';
+}
+
+const { posts, headingLevel: Heading = 'h3' } = Astro.props;
+---
+
+<ul class="post-list">
+  {
+    posts.map((post) => (
+      <li>
+        <article class="post-row">
+          <div class="post-row-head">
+            <Heading class="post-row-title-wrap">
+              <a class="post-row-title" href={postHref(post)}>
+                {post.data.title}
+              </a>
+            </Heading>
+            <span class="meta">
+              {post.data.draft && <span class="badge">draft</span>}{' '}
+              <time datetime={post.data.pubDate.toISOString()}>{formatDate(post.data.pubDate)}</time>
+            </span>
+          </div>
+          <p>{post.data.description}</p>
+          {post.data.tags.length > 0 && (
+            <div class="post-row-tags">
+              {post.data.tags.map((tag) => (
+                <a class="tag" href={tagHref(tag)}>
+                  {tag}
+                </a>
+              ))}
+            </div>
+          )}
+        </article>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .post-row-title-wrap {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+</style>

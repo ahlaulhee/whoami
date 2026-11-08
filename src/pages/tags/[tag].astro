@@ -1,0 +1,27 @@
+---
+import Icon from '../../components/Icon.astro';
+import PostList from '../../components/PostList.astro';
+import TagCloud from '../../components/TagCloud.astro';
+import Layout from '../../layouts/Layout.astro';
+import { getTags, type Post } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  return [...(await getTags())].map(([tag, posts]) => ({ params: { tag }, props: { posts } }));
+}
+
+interface Props {
+  posts: Post[];
+}
+
+const { tag } = Astro.params;
+const { posts } = Astro.props;
+---
+
+<Layout title={`#${tag}`} description={`Posts tagged ${tag}.`}>
+  <TagCloud slot="rail" current={tag} />
+
+  <section class="panel" aria-labelledby="tag-title">
+    <h1 class="panel-title" id="tag-title"><Icon name="lucide:tag" />#{tag}</h1>
+    <PostList posts={posts} headingLevel="h2" />
+  </section>
+</Layout>

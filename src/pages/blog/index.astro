@@ -1,0 +1,18 @@
+---
+import Icon from '../../components/Icon.astro';
+import PostList from '../../components/PostList.astro';
+import TagCloud from '../../components/TagCloud.astro';
+import Layout from '../../layouts/Layout.astro';
+import { getPosts } from '../../lib/posts';
+
+const posts = await getPosts();
+---
+
+<Layout title="Blog" description="Setup guides for Fedora, dwl and Neovim, each pinned to the versions it was tested on.">
+  <TagCloud slot="rail" />
+
+  <section class="panel" aria-labelledby="blog-title">
+    <h1 class="panel-title" id="blog-title"><Icon name="lucide:notebook-pen" />Blog</h1>
+    <PostList posts={posts} headingLevel="h2" />
+  </section>
+</Layout>

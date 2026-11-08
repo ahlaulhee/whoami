@@ -1,0 +1,225 @@
+---
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
+import '../styles/global.css';
+import { Image } from 'astro:assets';
+import avatar from '../assets/avatar.png';
+import Icon from '../components/Icon.astro';
+import { SITE } from '../lib/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  article?: { published: Date; modified?: Date; tags: string[] };
+}
+
+const { title, description = SITE.description, article } = Astro.props;
+const fullTitle = title ? `${title} · ${SITE.handle}` : `${SITE.handle} · ${SITE.name}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL('/og.png', Astro.site);
+const path = Astro.url.pathname;
+const nav = [
+  { href: '/blog/', label: 'blog', active: path.startsWith('/blog') || path.startsWith('/tags') },
+  { href: '/rss.xml', label: 'rss', active: false },
+];
+// a page may pass a conditional rail that renders nothing; only real markup gets the two-column layout
+const rail = Astro.slots.has('rail') ? (await Astro.slots.render('rail')).trim() : '';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content={SITE.name} />
+    <meta name="theme-color" content="#101010" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE.handle} blog`} href="/rss.xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <meta property="og:site_name" content={SITE.handle} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:title" content={title ?? fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en" />
+    <meta name="twitter:card" content="summary_large_image" />
+    {
+      article ? (
+        <>
+          <meta property="og:type" content="article" />
+          <meta property="article:published_time" content={article.published.toISOString()} />
+          {article.modified && <meta property="article:modified_time" content={article.modified.toISOString()} />}
+          {article.tags.map((tag) => <meta property="article:tag" content={tag} />)}
+        </>
+      ) : (
+        <meta property="og:type" content="website" />
+      )
+    }
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label={`${SITE.handle}, home`}>
+        <Image src={avatar} alt="" width={28} height={28} densities={[1, 2]} />
+        <span>{SITE.handle}</span>
+      </a>
+      <nav aria-label="Main">
+        <ul>
+          {
+            nav.map((item, i) => (
+              <li>
+                {i > 0 && <span class="sep" aria-hidden="true">/</span>}
+                <a href={item.href} aria-current={item.active ? 'page' : undefined}>
+                  {item.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </header>
+
+    <div class:list={['frame', { 'has-rail': rail }]}>
+      {rail && <aside class="rail" set:html={rail} />}
+      <main id="content" class="column">
+        <slot />
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <p>
+        Content is <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>, copy anything you like.
+      </p>
+      <p class="footer-links">
+        <a href={SITE.github}><Icon name="simple-icons:github" size={14} /> source</a>
+        <span aria-hidden="true">/</span>
+        <a href="/rss.xml"><Icon name="lucide:rss" size={14} /> rss</a>
+      </p>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header,
+  .frame,
+  .site-footer {
+    width: min(100% - 2 * var(--gap), 80rem);
+    margin-inline: auto;
+  }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1.75rem;
+    font-family: var(--mono);
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    color: var(--fg);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .brand img {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--line);
+  }
+
+  nav ul {
+    display: flex;
+    list-style: none;
+    padding: 0;
+  }
+
+  nav li {
+    display: flex;
+    align-items: center;
+  }
+
+  .sep {
+    color: var(--line-strong);
+    padding-inline: 0.5rem;
+  }
+
+  nav a {
+    padding: 0.25rem 0.5rem;
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  nav a:hover {
+    color: var(--blue);
+  }
+
+  nav a[aria-current='page'] {
+    background: var(--fg);
+    color: var(--panel);
+  }
+
+  .frame {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gap);
+    align-items: start;
+  }
+
+  .rail,
+  .column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    min-width: 0;
+  }
+
+  @media (min-width: 64em) {
+    .frame.has-rail {
+      grid-template-columns: var(--rail) minmax(0, 1fr);
+    }
+
+    .rail {
+      position: sticky;
+      top: 1.5rem;
+      max-height: calc(100dvh - 3rem);
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+  }
+
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    padding-block: 2.5rem 2rem;
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+
+  .footer-links {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .site-footer a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+</style>

@@ -1,6 +1,8 @@
-// shared by vite.config.js (build-time HTML) and src/main.js (browser refresh)
-const BIRTH = { y: 2000, m: 8, d: 4 };
-const START = { y: 2023, m: 12, d: 1 };
+// shared by the build (static HTML) and the home page script (browser refresh)
+type CalendarDate = { y: number; m: number; d: number };
+
+const BIRTH: CalendarDate = { y: 2000, m: 8, d: 4 };
+const START: CalendarDate = { y: 2023, m: 12, d: 1 };
 const TZ = 'America/Argentina/Cordoba';
 
 const cordobaDate = new Intl.DateTimeFormat('en-US', {
@@ -10,18 +12,18 @@ const cordobaDate = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
 });
 
-function today(now) {
+function today(now: Date): CalendarDate {
   const parts = Object.fromEntries(cordobaDate.formatToParts(now).map((p) => [p.type, p.value]));
   return { y: Number(parts.year), m: Number(parts.month), d: Number(parts.day) };
 }
 
 // whole months elapsed from `from` to the Córdoba calendar date of `now`
-function monthsSince(from, now) {
+function monthsSince(from: CalendarDate, now: Date) {
   const t = today(now);
   return (t.y - from.y) * 12 + (t.m - from.m) - (t.d < from.d ? 1 : 0);
 }
 
-const unit = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export function age(now = new Date()) {
   return Math.floor(monthsSince(BIRTH, now) / 12);

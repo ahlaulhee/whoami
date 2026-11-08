@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 
@@ -11,23 +11,27 @@ if (!existsSync(SHAPE_FONT)) {
 }
 GlobalFonts.registerFromPath(SHAPE_FONT, 'AsciiShape');
 GlobalFonts.registerFromPath(root('scripts/fonts/DepartureMono-Regular.otf'), 'Departure Mono');
+GlobalFonts.registerFromPath(
+  root('node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2'),
+  'Geist OG',
+);
 
 const HANDLE = 'ahlaulhee';
-// also written to src/tokens.css, edit colors here
+// Paradise (https://github.com/paradise-theme/paradise), matches src/styles/global.css
 const PALETTE = {
-  bg: '#0b0b0d',
-  fg: '#d9d4c7',
-  muted: '#8a857a',
-  amber: '#ffb454',
-  magenta: '#ff6ac1',
-  cyan: '#5ccfe6',
+  bg: '#151515',
+  fg: '#e8e3e3',
+  muted: '#a39d9d',
+  yellow: '#d9bc8c',
+  red: '#b66467',
+  blue: '#8da3b9',
 };
 // keyed by cell size
 const TIERS = {
-  64: { set: '@#&%$', color: 'amber' },
-  32: { set: '@#&%$', color: 'amber' },
-  16: { set: 'WXOA8', color: 'magenta' },
-  8: { set: '*+=xo', color: 'cyan' },
+  64: { set: '@#&%$', color: 'yellow' },
+  32: { set: '@#&%$', color: 'yellow' },
+  16: { set: 'WXOA8', color: 'red' },
+  8: { set: '*+=xo', color: 'blue' },
 };
 const GLYPH_SCALE = 1.2; // relative to the cell
 const SHAPE_PX = 240;
@@ -99,13 +103,6 @@ function quadtree(raster) {
   return cells;
 }
 
-const escapeXml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-function toSvg(cells, { w, h }) {
-  const body = cells.map((c) => `<text x="${c.x}" y="${c.y}" class="q${c.s}">${escapeXml(c.ch)}</text>`).join('');
-  return `<svg class="banner" viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false">${body}</svg>`;
-}
-
 function drawCells(ctx, cells, scale, dx, dy) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -114,33 +111,6 @@ function drawCells(ctx, cells, scale, dx, dy) {
     ctx.fillStyle = PALETTE[TIERS[c.s].color];
     ctx.fillText(c.ch, dx + c.x * scale, dy + c.y * scale);
   }
-}
-
-async function writeBanner() {
-  const raster = rasterize(HANDLE);
-  const cells = quadtree(raster);
-  const file = root('index.html');
-  const html = await readFile(file, 'utf8');
-  const marker = /(<!-- ascii:banner -->)[\s\S]*?(<!-- \/ascii:banner -->)/;
-  if (!marker.test(html)) throw new Error('index.html is missing the <!-- ascii:banner --> markers');
-  await writeFile(file, html.replace(marker, `$1${toSvg(cells, raster)}$2`));
-  return { raster, cells };
-}
-
-async function writeTokens() {
-  const vars = Object.entries(PALETTE).map(([name, hex]) => `  --${name}: ${hex};`);
-  const tiers = Object.entries(TIERS).map(
-    ([s, { color }]) => `.q${s} { font-size: ${+(s * GLYPH_SCALE).toFixed(2)}px; fill: var(--${color}); }`,
-  );
-  const css = [
-    ':root {',
-    ...vars,
-    '}',
-    '',
-    ...tiers,
-    '',
-  ].join('\n');
-  await writeFile(root('src/tokens.css'), css);
 }
 
 async function writePng(path, w, h, draw) {
@@ -165,27 +135,29 @@ async function writeSquare(text, size, path, span) {
   );
 }
 
-async function writeOg({ raster, cells }) {
+async function writeOg() {
+  const raster = rasterize(HANDLE);
+  const cells = quadtree(raster);
   const scale = 1000 / raster.w;
   await writePng('public/og.png', 1200, 630, (ctx) => {
     drawCells(ctx, cells, scale, 100, 150);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    ctx.font = '44px "Departure Mono"';
+    ctx.font = '600 46px "Geist OG"';
     ctx.fillStyle = PALETTE.fg;
-    ctx.fillText('Alex Laulhe · dev', 124, 150 + raster.h * scale + 70);
-    ctx.font = '33px "Departure Mono"';
+    ctx.fillText('Alex Laulhe · setup guides', 124, 150 + raster.h * scale + 70);
+    ctx.font = '34px "Geist OG"';
     ctx.fillStyle = PALETTE.muted;
-    ctx.fillText('Córdoba, Argentina', 124, 150 + raster.h * scale + 122);
+    ctx.fillText('Fedora, dwl, Neovim · Córdoba, Argentina', 124, 150 + raster.h * scale + 122);
   });
+  return cells.length;
 }
 
-await writeTokens();
-const banner = await writeBanner();
 await writeSquare('a', 64, 'public/favicon.png', 1.05);
 await writeSquare('a', 180, 'public/apple-touch-icon.png', 1.05);
-await writeOg(banner);
-await writeSquare('ahl', 1024, 'avatar.png', 0.86); // github avatar
+const glyphs = await writeOg();
+// site profile image and github avatar
+await writeSquare('ahl', 1024, 'src/assets/avatar.png', 0.86);
 console.log(
-  `banner: ${banner.cells.length} glyphs; wrote src/tokens.css, index.html, public/favicon.png, public/apple-touch-icon.png, public/og.png, avatar.png`,
+  `og banner: ${glyphs} glyphs; wrote public/favicon.png, public/apple-touch-icon.png, public/og.png, src/assets/avatar.png`,
 );

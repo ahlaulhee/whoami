@@ -1,0 +1,27 @@
+---
+// Icons are inlined at build time from Iconify JSON sets: no runtime, no sprite request.
+import lucide from '@iconify-json/lucide/icons.json';
+import simpleIcons from '@iconify-json/simple-icons/icons.json';
+import { getIconData, iconToHTML, iconToSVG } from '@iconify/utils';
+
+interface Props {
+  name: `lucide:${string}` | `simple-icons:${string}`;
+  size?: number;
+  class?: string;
+}
+
+const { name, size = 18, class: className } = Astro.props;
+const [prefix, icon] = name.split(':') as [string, string];
+const data = getIconData(prefix === 'lucide' ? lucide : simpleIcons, icon);
+if (!data) throw new Error(`Unknown icon "${name}"`);
+
+const { attributes, body } = iconToSVG(data, { height: size, width: size });
+const svg = iconToHTML(body, {
+  ...attributes,
+  class: ['icon', className].filter(Boolean).join(' '),
+  'aria-hidden': 'true',
+  focusable: 'false',
+});
+---
+
+<Fragment set:html={svg} />

@@ -1,0 +1,43 @@
+---
+import Icon from '../components/Icon.astro';
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Not found" description="This page does not exist.">
+  <section class="panel not-found" aria-labelledby="nf-title">
+    <p class="meta">404</p>
+    <h1 id="nf-title">No page at this address.</h1>
+    <p>Check the link for a typo, or start from the post list.</p>
+    <p class="links">
+      <a href="/blog/"><Icon name="lucide:notebook-pen" size={16} /> All posts</a>
+      <a href="/"><Icon name="lucide:arrow-left" size={16} /> Home</a>
+    </p>
+  </section>
+</Layout>
+
+<style>
+  .not-found {
+    display: grid;
+    gap: 1rem;
+    max-width: 48rem;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 1.2rem + 1.5vw, 2.25rem);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+</style>
