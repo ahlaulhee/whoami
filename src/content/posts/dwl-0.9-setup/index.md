@@ -8,7 +8,7 @@ testedOn: [Fedora 45, dwl 0.9, wlroots 0.20.2, akmod-nvidia 615.78, RTX 5070]
 series:
   name: Fedora 45 + dwl from scratch
   part: 2
-draft: true
+draft: false
 ---
 
 Part 1 left a Fedora 45 machine at a text console, with RPM Fusion, the codecs and the NVIDIA driver in place. This part turns it into my desktop: [dwl](https://codeberg.org/dwl/dwl) 0.9 with eight patches, a status bar fed by slstatus, a text login screen, both monitors at their full refresh rate, and Steam.

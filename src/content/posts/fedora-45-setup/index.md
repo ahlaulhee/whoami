@@ -8,7 +8,7 @@ testedOn: [Fedora 45, kernel 7.2, akmod-nvidia 615.78, RTX 5070]
 series:
   name: Fedora 45 + dwl from scratch
   part: 1
-draft: true
+draft: false
 ---
 
 This is the base for the rest of the series: a Fedora 45 install with no desktop environment, every package source I use enabled, and the NVIDIA driver loaded with Secure Boot still on. It ends at a text console. Part 2 builds the dwl desktop on top of it.
