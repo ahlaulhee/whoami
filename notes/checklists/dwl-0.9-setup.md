@@ -11,6 +11,9 @@ On the real machine:
 - NVIDIA section: record which (if any) WLR_* variables you needed and say so in the article.
 - greetd: confirm tuigreet on tty1 and dwl start correctly with kmscon on the other VTs; confirm `kmscon-launch-gui dwl-session` works from a console.
 - Screen sharing: test in a browser that the wlr portal shows up (Fedora's `wlroots-portals.conf` is relied upon).
+- VRR on NVIDIA: watch the monitor OSD refresh counter on the desktop and in a fullscreen game; report what the driver does (it forces VRR by default per the 615 README).
+- Portal override: confirm a GTK/libadwaita app follows dark mode with `Settings=gtk`.
+- Screen sharing: xdpw 0.8.4 has open NVIDIA issues (#411 freeze after first frame, #409); test OBS/Discord/browser and mention if hit.
 - Steam: confirm it starts under XWayland, and test one game with fullscreenadaptivesync (Super+F5) and the gamescope line.
 - Once a dotfiles repo exists, link the article's snippets to a fixed commit and consider pointing the patch downloads at it.
 - Hosted patches: `public/files/dwl-0.9/` (GPL-3.0, from dwl-patches, ported to v0.9). Porting details: `notes/research/dwl-0.9-patches.md`.

@@ -74,7 +74,9 @@ Tick **Encrypt my data**. Later in this guide you create a private key that can 
 
 ### User
 
-Create your user and tick the option that makes it an administrator. That adds the user to the `wheel` group, which is what lets it use `sudo`. You can leave the root account disabled.
+Create your user and tick the option that makes it an administrator. That adds the user to the `wheel` group, which is what lets it use `sudo`.
+
+If you leave the root account locked, systemd's emergency and rescue modes refuse to open a shell ("the root account is locked"). Those modes are where you end up when a bad `/etc/fstab` or a broken update stops the boot, so I give root a password here even though I never log in as root.
 
 Begin the installation, wait for it to download and install everything, and reboot into the new system.
 
@@ -127,6 +129,16 @@ While you are at it, install git. It's not part of any base group, and part 2 ne
 
 ```bash
 sudo dnf install git
+```
+
+### Turn off the SSH server
+
+Fedora enables `sshd` by default, and the default firewall zone lets SSH in. I never log into this machine remotely, so both go:
+
+```bash
+sudo systemctl disable --now sshd
+sudo firewall-cmd --permanent --remove-service=ssh
+sudo firewall-cmd --reload
 ```
 
 ## Enable RPM Fusion
@@ -249,6 +261,13 @@ The package handles the rest. In particular, don't do any of these:
 - Don't blacklist nouveau yourself. The package puts `rd.driver.blacklist=nouveau,nova_core` on the kernel command line.
 - Don't install `xorg-x11-drv-nvidia-libs.i686` by hand. Fedora pulls in the 32-bit libraries automatically; they matter later for Steam.
 - Don't rebuild the initramfs with `dracut`. RPM Fusion recommends keeping the driver out of it.
+- Don't enable `nvidia-suspend`, `nvidia-resume` and `nvidia-hibernate` by hand. With the open modules the kernel preserves video memory across suspend, and RPM Fusion's units only run when that mechanism is off.
+
+The driver's preset also enables `nvidia-powerd`, which handles Dynamic Boost on laptops. On a desktop it has nothing to do:
+
+```bash
+sudo systemctl disable --now nvidia-powerd
+```
 
 ### Check that the driver loaded
 
@@ -261,6 +280,15 @@ modinfo -F signer nvidia
 
 `nvidia-smi` should show the card and the driver version. `lsmod | grep nouveau` should print nothing, `modeset` should be `Y`, and `modinfo -F signer nvidia` should print the name of your akmods key instead of an empty line.
 
+Suspend once to make sure the machine comes back with a working screen:
+
+```bash
+grep UseKernelSuspendNotifiers /proc/driver/nvidia/params
+systemctl suspend
+```
+
+The first line should report `1`, which means the kernel handles video memory during suspend.
+
 ### If it doesn't load
 
 - **The build failed.** akmods leaves its logs in `/var/cache/akmods/nvidia/`. A failed build has a `.failed.log` named after the driver version and kernel. Once you've fixed the cause, rebuild with `sudo akmods --force --kernels $(uname -r)`.
@@ -269,7 +297,7 @@ modinfo -F signer nvidia
 
 ## Hardware video decoding
 
-`libva-nvidia-driver` lets programs that use VA-API, like Firefox and mpv, decode video on the GPU through NVDEC. It comes from Fedora's own repositories:
+`libva-nvidia-driver` translates VA-API, the video decoding interface Firefox and many other programs use, to NVDEC on the GPU. mpv doesn't need it; it talks to NVDEC directly. The package comes from Fedora's own repositories:
 
 ```bash
 sudo dnf install libva-nvidia-driver libva-utils

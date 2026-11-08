@@ -42,6 +42,7 @@ Everything in this guide lives in one git repository, `~/dotfiles`. Each program
 ├── kanshi/.config/kanshi/config
 ├── mako/.config/mako/config
 ├── swaylock/.config/swaylock/config
+├── portal/.config/xdg-desktop-portal/wlroots-portals.conf
 └── zathura/.config/zathura/zathurarc
 ```
 
@@ -54,8 +55,10 @@ git commit --allow-empty -m "Start dotfiles"
 Once the config files exist, link them into your home directory by naming the folders:
 
 ```bash
-stow -d ~/dotfiles -t ~ foot kanshi mako swaylock zathura
+stow --no-folding -d ~/dotfiles -t ~ foot kanshi mako portal swaylock zathura
 ```
+
+Without `--no-folding`, Stow links whole directories when it can, so `~/.config/foot` itself would point into the repo, and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files.
 
 Leave `dwl`, `slstatus` and `bin` out of that list. They are source trees and scripts, not configs for your home directory.
 
@@ -144,7 +147,7 @@ The autostart list replaces a separate startup script. Each program ends with a 
 
 ```c title="dwl/config.h"
 static const char *const autostart[] = {
-	"dbus-update-activation-environment", "--systemd", "WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", NULL,
+	"dbus-update-activation-environment", "--systemd", "WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", NULL,
 	"kanshi", NULL,
 	"swaybg", "-c", "151515", NULL,
 	"mako", NULL,
@@ -155,7 +158,7 @@ static const char *const autostart[] = {
 };
 ```
 
-The first line hands dwl's environment to systemd and D-Bus. Without it, the screen-sharing portal doesn't know which display to capture. `swaybg -c` paints a plain Paradise background; use `-i /path/to/image.png -m fill` for a wallpaper.
+The first line hands dwl's environment to systemd and D-Bus. Without it, the screen-sharing portal doesn't know which display to capture. The command comes from `dbus-tools`, which a Custom Operating System install doesn't include; it's in the package list further down. `swaybg -c` paints a plain Paradise background; use `-i /path/to/image.png -m fill` for a wallpaper.
 
 The swallow patch adds a rule that marks foot as the terminal. Keep it, since it is what tells swallow which windows to hide:
 
@@ -301,7 +304,15 @@ slstatus -s | dwl
 sudo install -m 755 ~/dotfiles/bin/dwl-session /usr/local/bin/dwl-session
 ```
 
-Fedora's `xdg-desktop-portal-wlr` package ships `/usr/share/xdg-desktop-portal/wlroots-portals.conf`. With `XDG_CURRENT_DESKTOP=wlroots`, that file sends screenshots and screen sharing to the wlr portal and everything else to the GTK one, so there is no portal config to write.
+Fedora's `xdg-desktop-portal-wlr` package ships `/usr/share/xdg-desktop-portal/wlroots-portals.conf`, which applies when `XDG_CURRENT_DESKTOP=wlroots`. It sends screenshots and screen sharing to the wlr portal and everything else to the GTK one, except the Settings portal, which it gives to darkman. Nothing installs darkman, so programs that ask the portal for the dark or light preference get no answer. A copy of the file in your home directory takes precedence:
+
+```ini title="~/dotfiles/portal/.config/xdg-desktop-portal/wlroots-portals.conf"
+[preferred]
+default=gtk
+org.freedesktop.impl.portal.ScreenCast=wlr
+org.freedesktop.impl.portal.Screenshot=wlr
+org.freedesktop.impl.portal.Settings=gtk
+```
 
 Replace the default session in `/etc/greetd/config.toml`. Fedora runs the greeter as the `greetd` user:
 
@@ -345,7 +356,7 @@ profile desk {
 }
 ```
 
-Use the names `wlr-randr` printed. If they change between boots, kanshi also accepts the monitor's `"Make Model Serial"` string from the same output. `adaptive_sync` is missing on purpose: the fullscreenadaptivesync patch turns VRR on and off as windows enter and leave fullscreen, and a permanent setting here would undo that.
+Use the names `wlr-randr` printed. If they change between boots, kanshi also accepts the monitor's `"Make Model Serial"` string from the same output. If kanshi doesn't apply a mode, write the refresh rate exactly as `wlr-randr` lists it (for example `239.970Hz`). `adaptive_sync` is left out on purpose; VRR is covered in the gaming section.
 
 ## NVIDIA environment variables
 
@@ -368,7 +379,7 @@ sudo dnf install foot wmenu swaybg mako libnotify swaylock swayidle \
   wl-clipboard cliphist grim slurp grimpicker \
   xdg-desktop-portal-wlr xdg-desktop-portal-gtk lxqt-policykit xdg-user-dirs \
   nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui \
-  vercel-geist-fonts vercel-geist-mono-fonts google-noto-color-emoji-fonts
+  vercel-geist-fonts vercel-geist-mono-fonts google-noto-color-emoji-fonts dbus-tools
 xdg-user-dirs-update
 ```
 
@@ -478,7 +489,7 @@ Steam's launch options for a game take these tools as prefixes before `%command%
 
 Inside gamescope, use its `--mangoapp` flag instead of `mangohud`.
 
-For VRR, the fullscreenadaptivesync patch does the work. When a game goes fullscreen, dwl enables adaptive sync on that monitor, and turns it off again when the game leaves fullscreen, so the desktop never flickers at low refresh rates. Super+F5 turns the behaviour off if a game misbehaves with it.
+For VRR, the fullscreenadaptivesync patch enables adaptive sync on a monitor when a window goes fullscreen there and disables it when the window leaves fullscreen. Super+F5 turns that behaviour off. On NVIDIA there is a catch: the driver's README says its KMS implementation "forces all VRR capable displays into VRR mode by default", so the monitor may run in VRR mode on the desktop too, whatever dwl asks for. Watch the refresh rate counter in the monitor's on-screen menu: if it moves around on the desktop, the driver is doing it. The `conceal_vrr_caps=1` option of the `nvidia_modeset` module stops that, but it hides VRR from dwl as well, so games lose it too.
 
 ## Where this leaves you
 
