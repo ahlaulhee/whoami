@@ -55,11 +55,11 @@ sudo dd if=Fedora-Everything-netinst-x86_64-45-1.4.iso of=/dev/sdX bs=4M status=
 
 ## Install Fedora 45 Everything
 
-Boot from the stick. The Everything image still uses the classic installer, with its summary screen of sections (spokes) you visit one by one. The new web installer only ships on the Atomic editions in Fedora 45.
+Boot from the stick. The Everything image uses the classic installer, with a summary screen of sections (spokes) you visit one by one.
 
 ### Software selection
 
-Older guides tell you to pick "Minimal Install". That option is gone since Fedora 41. The base environment is now called **Fedora Custom Operating System** and installs the `core` group. Tick two of its add-ons:
+Pick **Fedora Custom Operating System**, which installs the `core` group, and tick two of its add-ons:
 
 - **Standard** brings the tools you expect on any Linux box: `bash-completion`, `man-pages`, `nano`, `tar`, `unzip`, `rsync`, `lspci`, CPU microcode and so on.
 - **Common NetworkManager Submodules** adds Wi-Fi and Bluetooth support to NetworkManager. Skip it only if the machine will always be on Ethernet.
@@ -111,8 +111,6 @@ sudo dnf config-manager setopt max_parallel_downloads=10 defaultyes=True
 - `max_parallel_downloads` defaults to 3 (the maximum is 20). Ten helps a lot on big updates.
 - `defaultyes=True` makes Enter mean "yes" at the confirmation prompt. You still get the prompt, which is the difference from `assumeyes`.
 
-You will find `fastestmirror=True` in a lot of guides. I leave it off. It picks mirrors by connection latency alone and throws away the order Fedora's mirror manager already gives you, which takes bandwidth and your location into account ([dnf5.conf docs](https://dnf5.readthedocs.io/en/latest/dnf5.conf.5.html)).
-
 Now update everything. The installer pulls fresh packages, but there is usually a newer kernel by the time you boot:
 
 ```bash
@@ -147,8 +145,6 @@ Also enable Fedora's OpenH264 repository. Cisco builds and hosts that package, a
 sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1
 ```
 
-The RPM Fusion page also mentions `rpmfusion-*-appstream-data`. That metadata is only for graphical app stores like GNOME Software, so skip it.
-
 ## Multimedia codecs
 
 Fedora ships `ffmpeg-free`, which leaves out patent-encumbered codecs. Swap it for RPM Fusion's full build, then install the multimedia group. These are the commands from the [RPM Fusion multimedia page](https://rpmfusion.org/Howto/Multimedia):
@@ -176,7 +172,7 @@ A BIOS update can wipe the keys you enroll in the next section. Run firmware upd
 
 ## NVIDIA driver
 
-The RTX 5070 is a Blackwell card, and NVIDIA only supports Blackwell with its open kernel modules ([NVIDIA README](https://download.nvidia.com/XFree86/Linux-x86_64/615.78.08/README/kernel_open.html)). RPM Fusion's `akmod-nvidia` already uses the open modules by default, so there is no extra package or option to set. You may see `akmod-nvidia-open` mentioned in older guides; RPM Fusion asks people not to use it unless they patch the driver themselves.
+The RTX 5070 is a Blackwell card, and NVIDIA only supports Blackwell with its open kernel modules ([NVIDIA README](https://download.nvidia.com/XFree86/Linux-x86_64/615.78.08/README/kernel_open.html)). RPM Fusion's `akmod-nvidia` already uses the open modules by default, so there is no extra package or option to set.
 
 `akmods` builds the kernel module on your machine, and rebuilds it every time a new kernel arrives. With Secure Boot on, the firmware refuses modules that aren't signed by a key it trusts, and you end up with a black screen or software rendering. So the order matters: create a signing key and enroll it in the firmware first, then install the driver. From then on akmods signs every build automatically.
 
@@ -247,7 +243,7 @@ Once `modinfo` prints a version, reboot:
 systemctl reboot
 ```
 
-Older guides add a few steps that you should skip on Fedora 45:
+The package handles the rest. In particular, don't do any of these:
 
 - Don't add `nvidia-drm.modeset=1` to the kernel command line. Modeset is on by default, and RPM Fusion says the parameter now conflicts with Fedora's early-boot display handling.
 - Don't blacklist nouveau yourself. The package puts `rd.driver.blacklist=nouveau,nova_core` on the kernel command line.
@@ -280,7 +276,7 @@ sudo dnf install libva-nvidia-driver libva-utils
 vainfo --display drm
 ```
 
-`vainfo` should name `VA-API NVDEC driver` as the driver and list the codecs it can decode. Many guides set `NVD_BACKEND=direct` for this driver. The [driver's README](https://github.com/elFarto/nvidia-vaapi-driver) says `direct` is the default now, so leave it out.
+`vainfo` should name `VA-API NVDEC driver` as the driver and list the codecs it can decode.
 
 ## Where this leaves you
 
