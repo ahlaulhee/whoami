@@ -11,14 +11,6 @@ series:
 draft: true
 ---
 
-<!--
-Author notes (draft only, delete before publishing):
-- Set pubDate to the publish day and confirm every testedOn version on the real machine.
-- Link dotfiles snippets to a fixed commit, not to main.
-- Patches: bar, autostart, vanitygaps, alwayscenter, swapfocus, swallow, warpcursor, fullscreenadaptivesync.
-- Only document NVIDIA environment variables that fixed something on this machine.
--->
-
 ## What you end up with
 
 ## Wayland base packages
