@@ -1,7 +1,18 @@
 # dwl-0.9-setup: before publishing
 
-- Set `pubDate` to the publish day and confirm every `testedOn` version on the real machine.
-- Link dotfiles snippets to a fixed commit, not to `main`.
-- Patches: bar, autostart, vanitygaps, alwayscenter, swapfocus, swallow, warpcursor, fullscreenadaptivesync.
-- Only document NVIDIA environment variables that fixed something on this machine.
-- Fedora 45 runs kmscon on tty1-6 and it holds the DRM device. Check how greetd/dwl coexist with it (`kmscon-launch-gui`, or greetd on its own VT). Source: `notes/research/fedora-45-base.md` §3.
+Verified in a Fedora 45 WSL build environment on 2026-11-08: build dependencies, subtree + `git am --directory=dwl` with the hosted mbox, `config.h` below, slstatus build, Stow layout, `foot --check-config`, and a headless run of dwl with slstatus, autostart (kanshi, swaybg, mako, polkit agent, cliphist, swayidle), foot and a mako notification. Not verifiable there: real monitors, NVIDIA, greetd/kmscon on a real VT, XWayland/Steam, screen sharing.
+
+On the real machine:
+
+- Set `pubDate` and confirm every `testedOn` version (driver may be 620.x after updates).
+- Keybinds and `config.h` choices are a proposal (Super as MODKEY, the extra bindings table, Paradise colors, `swaybg -c 151515`, 600 s idle lock). Replace with your own and update the article's snippets and table.
+- Keyboard layout: `xkb_rules` is left at the default (us). Add `.layout = "..."` if you use another layout, and mention it.
+- Run `wlr-randr` and put the real output names in the kanshi config (the article shows DP-1/DP-2).
+- NVIDIA section: record which (if any) WLR_* variables you needed and say so in the article.
+- greetd: confirm tuigreet on tty1 and dwl start correctly with kmscon on the other VTs; confirm `kmscon-launch-gui dwl-session` works from a console.
+- Screen sharing: test in a browser that the wlr portal shows up (Fedora's `wlroots-portals.conf` is relied upon).
+- Steam: confirm it starts under XWayland, and test one game with fullscreenadaptivesync (Super+F5) and the gamescope line.
+- Once a dotfiles repo exists, link the article's snippets to a fixed commit and consider pointing the patch downloads at it.
+- Hosted patches: `public/files/dwl-0.9/` (GPL-3.0, from dwl-patches, ported to v0.9). Porting details: `notes/research/dwl-0.9-patches.md`.
+- Screenshots next to the article: the desktop with the bar, tuigreet, a notification.
+- Then set `draft: false`.
