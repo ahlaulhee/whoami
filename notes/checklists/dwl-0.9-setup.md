@@ -16,6 +16,7 @@ On the real machine:
 - Screen sharing: xdpw 0.8.4 has open NVIDIA issues (#411 freeze after first frame, #409); test OBS/Discord/browser and mention if hit.
 - Font: Maple Mono 7.9 TTF verified in WSL (checksum, fontconfig name, bar/foot/mako render; foot shows the cursive italic but no ligatures). Confirm the size (11 bar/menu, 12 foot) on your 1440p/1080p screens.
 - wlopm: confirm monitors turn off after 15 min and come back on input.
+- Idle: confirm Super+Shift+i toggles (notification) and that mpv/a browser video on a hidden tag keeps the screen awake with `bypass_surface_visibility = 1`. Toggle logic verified in WSL; swayidle 1.9.0 ignores `systemd-inhibit` (swayidle#198, reproduced in WSL).
 - Steam: confirm it starts under XWayland, and test one game with fullscreenadaptivesync (Super+F5) and the gamescope line.
 - Once a dotfiles repo exists, link the article's snippets to a fixed commit and consider pointing the patch downloads at it.
 - Hosted patches: `public/files/dwl-0.9/` (GPL-3.0, from dwl-patches, ported to v0.9). Porting details: `notes/research/dwl-0.9-patches.md`.

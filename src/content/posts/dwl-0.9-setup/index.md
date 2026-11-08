@@ -36,6 +36,7 @@ Everything in this guide lives in one git repository, `~/dotfiles`. Each program
 ```txt
 ~/dotfiles
 ├── bin/dwl-session                    # copied to /usr/local/bin
+├── bin/dwl-idle                       # copied to /usr/local/bin
 ├── dwl/                               # dwl source tree (git subtree)
 ├── slstatus/                          # slstatus source tree (git subtree)
 ├── fonts/.local/share/fonts/maple-mono/
@@ -155,12 +156,12 @@ static const char *const autostart[] = {
 	"mako", NULL,
 	"/usr/libexec/lxqt-policykit-agent", NULL,
 	"wl-paste", "--watch", "cliphist", "store", NULL,
-	"swayidle", "-w", "timeout", "600", "swaylock -f", "timeout", "900", "wlopm --off '*'", "resume", "wlopm --on '*'", "before-sleep", "swaylock -f", NULL,
+	"/usr/local/bin/dwl-idle", NULL,
 	NULL /* terminate */
 };
 ```
 
-The first line hands dwl's environment to systemd and D-Bus. Without it, the screen-sharing portal doesn't know which display to capture. The command comes from `dbus-tools`, which a Custom Operating System install doesn't include; it's in the package list further down. `swaybg -c` paints a plain Paradise background; use `-i /path/to/image.png -m fill` for a wallpaper.
+The first line hands dwl's environment to systemd and D-Bus. Without it, the screen-sharing portal doesn't know which display to capture. The command comes from `dbus-tools`, which a Custom Operating System install doesn't include; it's in the package list further down. `swaybg -c` paints a plain Paradise background; use `-i /path/to/image.png -m fill` for a wallpaper. `dwl-idle` is a short swayidle script, covered in [Locking, screens off, and games](#locking-screens-off-and-games).
 
 The swallow patch adds a rule that marks foot as the terminal. Keep it, since it is what tells swallow which windows to hide:
 
@@ -198,6 +199,8 @@ static const Key keys[] = {
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_s,      spawn, SHCMD("grim -g \"$(slurp)\" - | wl-copy") },
 	{ 0,                         XKB_KEY_Print,  spawn, SHCMD("grim \"$HOME/Pictures/$(date +%F_%H-%M-%S).png\"") },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_x,      spawn, SHCMD("grimpicker --copy --notify") },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_i,      spawn, SHCMD("pkill -x swayidle && notify-send 'Idle' 'Lock and screen-off disabled' "
+		"|| { /usr/local/bin/dwl-idle & notify-send 'Idle' 'Lock and screen-off enabled'; }") },
 	{ 0, XKB_KEY_XF86AudioRaiseVolume, spawn, SHCMD("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+") },
 	{ 0, XKB_KEY_XF86AudioLowerVolume, spawn, SHCMD("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-") },
 	{ 0, XKB_KEY_XF86AudioMute,        spawn, SHCMD("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") },
@@ -214,6 +217,7 @@ static const Key keys[] = {
 | Print | screenshot of everything, to `~/Pictures` |
 | Super+Shift+x | pick a color, copy its hex code |
 | Super+Escape | lock the screen |
+| Super+Shift+i | turn the automatic lock and screen-off off or back on |
 | Super+s | back to the previous window (swapfocus) |
 | Super+b | show or hide the bar |
 | Super+a, Super+Shift+a | swallow the focused window, toggle automatic swallowing |
@@ -404,7 +408,32 @@ PipeWire and WirePlumber came with `@multimedia` in part 1. `wpctl`, from WirePl
 
 `xdg-user-dirs-update` creates `~/Pictures` and the other standard folders; the Print binding saves there.
 
+### Locking, screens off, and games
+
+swayidle runs from a small script, so the autostart entry and the toggle key start exactly the same thing:
+
+```sh title="~/dotfiles/bin/dwl-idle"
+#!/bin/sh
+# lock after 10 minutes, monitors off after 15, lock before suspend
+exec swayidle -w \
+	timeout 600 'swaylock -f' \
+	timeout 900 "wlopm --off '*'" resume "wlopm --on '*'" \
+	before-sleep 'swaylock -f'
+```
+
+```bash
+sudo install -m 755 ~/dotfiles/bin/dwl-idle /usr/local/bin/dwl-idle
+```
+
 `wlopm` turns the monitors off through the output power protocol, which dwl implements. `wlr-randr --off` looks similar, but dwl treats it as an unplugged monitor and moves its windows to the other screen.
+
+swayidle only counts keyboard and mouse input that goes through dwl as activity. A game played with a controller reads the controller directly, so after ten minutes of only using the gamepad the screen locks in the middle of the game. Video players and browsers avoid this by asking the compositor not to go idle, but dwl only honours that request while the window asking is visible. Turn that off in `config.h`, so a video on another tag or monitor also keeps the screen awake:
+
+```c title="dwl/config.h"
+static const int bypass_surface_visibility = 1;  /* 1 means idle inhibitors will disable idle tracking even if it's surface isn't visible  */
+```
+
+For games, Super+Shift+i kills swayidle, which stops both the lock and the screen-off, and starts it again on the next press. A notification says which state you're in. `systemd-inhibit --what=idle` would be the obvious tool for this, but swayidle 1.9.0, the version in Fedora 45, fails to read logind's inhibitors ([swayidle#198](https://github.com/swaywm/swayidle/issues/198)), so it ignores them.
 
 ### Screen sharing
 
