@@ -110,7 +110,7 @@ o.scrolloff = 10
 o.splitright = true
 o.splitbelow = true
 o.list = true
-o.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
+o.listchars = { tab = "  ", nbsp = "␣" } -- tabs look like spaces; mark only non-breaking spaces
 o.winborder = "rounded" -- default border for floats (hover, signature help, diagnostics)
 o.inccommand = "split" -- live preview of :s in a split
 o.confirm = true -- ask instead of failing on :q with unsaved changes
@@ -376,6 +376,13 @@ return {
 ```
 
 The Roslyn server isn't in mason's main registry; the [Crashdummyy registry](https://github.com/Crashdummyy/mason-registry) packages it from the same builds the VS Code extension downloads, which is why `registries` lists both. roslyn.nvim finds the `.sln` or `.csproj` above the file you open and starts the server for that solution. The first start in a project takes a while, because Roslyn loads and analyzes the whole solution.
+
+On Linux, Neovim doesn't offer file watching to language servers, so Roslyn watches the solution itself, and each folder tree it watches costs one inotify instance. The kernel allows 128 instances per user, shared by every program in the session. A five-project solution used 20 of them in my tests and a 40-project one 48. When Roslyn runs out, the projects it hadn't loaded yet fail with `The configured user limit (128) on the number of inotify instances has been reached` in `:LspLog`, and completion and diagnostics stop working in them. Raise the limit once:
+
+```bash
+echo 'fs.inotify.max_user_instances = 1024' | sudo tee /etc/sysctl.d/90-inotify.conf
+sudo sysctl --system
+```
 
 `MasonInstallAll` installs everything in `tools` that's missing, and the `VimEnter` autocmd runs it on every start, so a new machine fills itself in the first time you open Neovim. To do it in one go from a shell, which blocks until every download has finished:
 

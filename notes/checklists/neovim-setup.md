@@ -5,7 +5,7 @@ Verified in the Fedora 45 WSL environment on 2026-11-08 (details in `notes/resea
 Only the real machine can confirm:
 
 - `testedOn` versions (Neovim, tmux, .NET SDK, Node, Go, Python) on your install.
-- Roslyn on a real solution (first start ~7 s in the test project; larger solutions take longer).
+- Roslyn on a real solution: VacacionesEvolution loaded in 4 to 6 s in WSL (`notes/research/roslyn-inotify.md`). On the desktop, with Firefox, Steam and the rest running, check how many inotify instances are in use (`find /proc/[0-9]*/fd -lname 'anon_inode:inotify' 2>/dev/null | wc -l`) and that `:LspLog` has no "inotify instances" errors after the sysctl change.
 - `<Tab>` vs `<C-i>` distinct inside tmux in foot (extended-keys settings load, behaviour untested).
 - Clipboard: yank in Neovim → paste in another app (wl-clipboard) and tmux copy mode `y` → paste.
 - Keymaps: carried over from github.com/ahlaulhee/neovim; adjust to taste.
