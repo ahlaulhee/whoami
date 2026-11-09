@@ -72,9 +72,9 @@ ShellRoot {
         onMessage: c => root.windowTitle = c.title ?? ""
     }
 
-    // MPD through mpDris2; any other MPRIS player is ignored.
-    readonly property MprisPlayer mpd: Mpris.players.values
-        .find(p => p.identity === "Music Player Daemon") ?? null
+    // kew's built-in MPRIS server; any other MPRIS player is ignored.
+    readonly property MprisPlayer music: Mpris.players.values
+        .find(p => p.identity === "kew") ?? null
 
     // Volume widget for a PipeWire node: click mutes, wheel changes by 5 %.
     component Volume: Label {
@@ -166,7 +166,7 @@ ShellRoot {
                 text: root.windowTitle
             }
 
-            // Right: MPD, volume, mic, clock, tray.
+            // Right: music, volume, mic, clock, tray.
             RowLayout {
                 id: right
                 anchors.right: parent.right
@@ -175,7 +175,7 @@ ShellRoot {
                 spacing: 18
 
                 Label {
-                    readonly property MprisPlayer player: root.mpd
+                    readonly property MprisPlayer player: root.music
                     visible: player !== null
                     text: player ? `${player.isPlaying ? "▶" : "‖"} ${player.trackArtist} - ${player.trackTitle}` : ""
                     color: player?.isPlaying ? root.fg : root.muted

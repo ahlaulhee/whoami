@@ -1,7 +1,7 @@
 ---
 slug: mango-0.18-setup
 title: Building a Mango desktop on Fedora 45
-description: Mango 0.18 with the scrolling layout on every tag, a Quickshell status bar, MPD with rmpc, greetd, both monitors at full refresh, and Steam on NVIDIA.
+description: Mango 0.18 with the scrolling layout on every tag, a Quickshell status bar, kew for music, greetd, both monitors at full refresh, and Steam on NVIDIA.
 pubDate: 2026-11-08
 tags: [mango, wayland, quickshell, fedora, nvidia, gaming]
 testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, akmod-nvidia 615.78, RTX 5070]
@@ -11,7 +11,7 @@ series:
 draft: false
 ---
 
-Part 1 left a Fedora 45 machine at a text console, with RPM Fusion, the codecs and the NVIDIA driver in place. This part turns it into my desktop: [Mango](https://github.com/mangowm/mango) 0.18 with the scrolling layout on every tag, a status bar written in [Quickshell](https://quickshell.org/), MPD for music, a text login screen, both monitors at their full refresh rate, and Steam.
+Part 1 left a Fedora 45 machine at a text console, with RPM Fusion, the codecs and the NVIDIA driver in place. This part turns it into my desktop: [Mango](https://github.com/mangowm/mango) 0.18 with the scrolling layout on every tag, a status bar written in [Quickshell](https://quickshell.org/), kew for music, a text login screen, both monitors at their full refresh rate, and Steam.
 
 Mango started as a fork of dwl and keeps its model: tags instead of workspaces, one set per monitor, nothing around it you didn't install. Unlike dwl it reads a config file that applies as soon as you save it, and it ships layouts dwl doesn't have. The one I use everywhere is the scroller: windows sit side by side in a strip that can be wider than the screen, and moving focus slides the strip.
 
@@ -37,12 +37,10 @@ All the configuration lives in one git repository, `~/dotfiles`. Each program ge
 ├── bin/mango-idle                     # copied to /usr/local/bin
 ├── fonts/.local/share/fonts/maple-mono/
 ├── foot/.config/foot/foot.ini
+├── kew/.config/kew/themes/paradise.theme
 ├── mako/.config/mako/config
 ├── mango/.config/mango/config.conf
-├── mpd/.config/mpd/mpd.conf
 ├── quickshell/.config/quickshell/shell.qml
-├── rmpc/.config/rmpc/config.ron
-├── rmpc/.config/rmpc/themes/paradise.ron
 ├── swaylock/.config/swaylock/config
 ├── xdpw/.config/xdg-desktop-portal-wlr/config
 └── zathura/.config/zathura/zathurarc
@@ -56,7 +54,7 @@ git init ~/dotfiles
 Once the files exist, link them by naming the folders:
 
 ```bash
-stow --no-folding -d ~/dotfiles -t ~ fonts foot mako mango mpd quickshell rmpc swaylock xdpw zathura
+stow --no-folding -d ~/dotfiles -t ~ fonts foot kew mako mango quickshell swaylock xdpw zathura
 ```
 
 Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` stays out of the list; its script is copied to `/usr/local/bin`.
@@ -274,16 +272,16 @@ sudo systemctl set-default graphical.target
 
 ## The status bar in Quickshell
 
-Quickshell is a toolkit for writing desktop shells in QML, the declarative language Qt uses for interfaces. A bar is one QML file that Quickshell reloads every time you save it. Mine sits docked along the top of each monitor, from one corner to the other, with the tags on the left, the focused window's title in the middle, and MPD, volume, microphone, date and the system tray on the right.
+Quickshell is a toolkit for writing desktop shells in QML, the declarative language Qt uses for interfaces. A bar is one QML file that Quickshell reloads every time you save it. Mine sits docked along the top of each monitor, from one corner to the other, with the tags on the left, the focused window's title in the middle, and the current song, volume, microphone, date and the system tray on the right.
 
 Fedora 45 has Quickshell, but its package is a February 2026 snapshot from before version 0.3. The [errornointernet/quickshell](https://copr.fedorainfracloud.org/coprs/errornointernet/quickshell/) COPR has the current release, 0.3.2, and replaces Fedora's package when enabled:
 
 ```bash
 sudo dnf copr enable errornointernet/quickshell
-sudo dnf install quickshell mpdris2
+sudo dnf install quickshell
 ```
 
-Quickshell has modules for the Hyprland and i3 IPC, but none for Mango. It doesn't need one: `mmsg watch tags DP-1` prints the tags of a monitor as one JSON object per line every time they change, and `mmsg watch focusing-client` does the same for the focused window. The bar runs both and parses the lines. Volume and microphone come from Quickshell's PipeWire service, the tray from its StatusNotifier service, and MPD through MPRIS, which is what `mpdris2` provides.
+Quickshell has modules for the Hyprland and i3 IPC, but none for Mango. It doesn't need one: `mmsg watch tags DP-1` prints the tags of a monitor as one JSON object per line every time they change, and `mmsg watch focusing-client` does the same for the focused window. The bar runs both and parses the lines. Volume and microphone come from Quickshell's PipeWire service, the tray from its StatusNotifier service, and the song from kew's MPRIS interface, the standard D-Bus interface media players use to report what they're playing.
 
 ```qml title="~/dotfiles/quickshell/.config/quickshell/shell.qml"
 //@ pragma UseQApplication
@@ -360,9 +358,9 @@ ShellRoot {
         onMessage: c => root.windowTitle = c.title ?? ""
     }
 
-    // MPD through mpDris2; any other MPRIS player is ignored.
-    readonly property MprisPlayer mpd: Mpris.players.values
-        .find(p => p.identity === "Music Player Daemon") ?? null
+    // kew's built-in MPRIS server; any other MPRIS player is ignored.
+    readonly property MprisPlayer music: Mpris.players.values
+        .find(p => p.identity === "kew") ?? null
 
     // Volume widget for a PipeWire node: click mutes, wheel changes by 5 %.
     component Volume: Label {
@@ -454,7 +452,7 @@ ShellRoot {
                 text: root.windowTitle
             }
 
-            // Right: MPD, volume, mic, clock, tray.
+            // Right: music, volume, mic, clock, tray.
             RowLayout {
                 id: right
                 anchors.right: parent.right
@@ -463,7 +461,7 @@ ShellRoot {
                 spacing: 18
 
                 Label {
-                    readonly property MprisPlayer player: root.mpd
+                    readonly property MprisPlayer player: root.music
                     visible: player !== null
                     text: player ? `${player.isPlaying ? "▶" : "‖"} ${player.trackArtist} - ${player.trackTitle}` : ""
                     color: player?.isPlaying ? root.fg : root.muted
@@ -538,103 +536,92 @@ A few details in it:
 
 The file is also [here](/files/mango-0.18/shell.qml) to download.
 
-## Music: MPD and rmpc
+## Music: kew
 
-[MPD](https://www.musicpd.org/) plays music in the background and any client controls it. Fedora's package ships user units, so it runs as your user with a config in your home directory:
-
-```bash
-sudo dnf install mpd mpc
-mkdir -p ~/Music ~/.local/share/mpd/playlists ~/.local/state/mpd
-```
-
-```txt title="~/dotfiles/mpd/.config/mpd/mpd.conf"
-music_directory    "~/Music"
-playlist_directory "~/.local/share/mpd/playlists"
-db_file            "~/.local/share/mpd/database"
-state_file         "~/.local/state/mpd/state"
-sticker_file       "~/.local/share/mpd/sticker.sql"
-
-auto_update        "yes"
-restore_paused     "yes"
-
-audio_output {
-    type "pipewire"
-    name "PipeWire"
-}
-```
-
-Start MPD through its socket, so it launches on the first connection, and start the MPRIS bridge the bar reads:
+[kew](https://kewplayer.com/) is a terminal music player that plays the files in a folder: no daemon, no database to build, and covers, a visualizer and lyrics in the terminal. It's in Terra:
 
 ```bash
-systemctl --user enable --now mpd.socket
-systemctl --user enable --now mpDris2.service
-mpc outputs
+sudo dnf install kew
+kew
 ```
 
-`mpc outputs` should list the PipeWire output as enabled. The directories have to exist before MPD starts; it complains about a missing database and state file only on the very first run.
+The first time it starts, kew asks for the music folder and suggests `~/Music`; press Enter to accept or type another path. It then writes `~/.config/kew/kewrc` with every setting and a comment for each, and copies its bundled themes to `~/.config/kew/themes/`. Changes you make inside the app go to a separate `kewstaterc`, so kewrc stays as you edit it.
 
-For the client I use [rmpc](https://github.com/mierak/rmpc), a terminal client that shows album art in terminals that support it. It's in Terra:
+kew themes are small INI files. This one uses the Paradise colors:
 
-```bash
-sudo dnf install rmpc
+```ini title="~/dotfiles/kew/.config/kew/themes/paradise.theme"
+[theme]
+name=Paradise
+
+accent=#d9bc8c
+text=#e8e3e3
+textDim=#e8e3e3
+textMuted=#a39d9d
+
+logo=#a39d9d
+header=#8da3b9
+footer=#a39d9d
+help=#e8e3e3
+link=#8c977d
+nowplaying=#d9bc8c
+playbackstatus=#a39d9d
+
+playlist.rownum=#a39d9d
+playlist.title=#e8e3e3
+playlist.playing=#d9bc8c
+
+trackview.title=#e8e3e3
+trackview.artist=#a39d9d
+trackview.album=#a39d9d
+trackview.year=#a39d9d
+trackview.time=#a39d9d
+trackview.visualizer=#8da3b9
+trackview.lyrics=#a39d9d
+
+library.artist=#8da3b9
+library.album=#e8e3e3
+library.track=#e8e3e3
+library.enqueued=#8c977d
+library.playing=#d9bc8c
+
+search.label=#a39d9d
+search.query=#8da3b9
+search.result=#e8e3e3
+search.enqueued=#8c977d
+search.playing=#d9bc8c
+
+progress.filled=#d9bc8c
+progress.empty=#424242
+progress.elapsed=#a39d9d
+
+status.info=-1
+status.warning=#d9bc8c
+status.error=#b66467
+status.success=#8c977d
 ```
 
-```txt title="~/dotfiles/rmpc/.config/rmpc/config.ron"
-#![enable(implicit_some)]
-#![enable(unwrap_newtypes)]
-#![enable(unwrap_variant_newtypes)]
-(
-    address: "127.0.0.1:6600",
-    theme: "paradise",
-    volume_step: 5,
-)
+Then select it in the `[colors]` section of the generated kewrc. By default kew takes its colors from the album cover; `colorMode=2` makes it use the theme instead:
+
+```ini title="~/.config/kew/kewrc"
+[colors]
+theme=paradise
+colorMode=2
 ```
 
-Everything not set there keeps rmpc's default. The theme file, next to it in `themes/paradise.ron`, only sets colors:
+The `i` key cycles through the color modes while kew runs, if you want the album colors back for a while.
 
-```txt title="~/dotfiles/rmpc/.config/rmpc/themes/paradise.ron"
-#![enable(implicit_some)]
-#![enable(unwrap_newtypes)]
-#![enable(unwrap_variant_newtypes)]
-(
-    background_color: "#151515",
-    text_color: "#e8e3e3",
-    header_background_color: "#151515",
-    modal_background_color: "#151515",
-    preview_label_style: (fg: "#d9bc8c"),
-    preview_metadata_group_style: (fg: "#d9bc8c", modifiers: "Bold"),
-    highlighted_item_style: (fg: "#8da3b9", modifiers: "Bold"),
-    current_item_style: (fg: "#151515", bg: "#8da3b9", modifiers: "Bold"),
-    borders_style: (fg: "#424242"),
-    highlight_border_style: (fg: "#8da3b9"),
-    level_styles: (
-        info: (fg: "#8da3b9", bg: "#151515"),
-        warn: (fg: "#d9bc8c", bg: "#151515"),
-        error: (fg: "#b66467", bg: "#151515"),
-        debug: (fg: "#8c977d", bg: "#151515"),
-        trace: (fg: "#a988b0", bg: "#151515"),
-    ),
-    progress_bar: (
-        symbols: ["█", "█", "█", " ", "█"],
-        track_style: (fg: "#424242"),
-        elapsed_style: (fg: "#8da3b9"),
-        thumb_style: (fg: "#8da3b9"),
-        use_track_when_empty: true,
-    ),
-    scrollbar: (
-        symbols: ["│", "█", "▲", "▼"],
-        track_style: (fg: "#424242"),
-        ends_style: (fg: "#424242"),
-        thumb_style: (fg: "#8da3b9"),
-    ),
-    tab_bar: (
-        active_style: (fg: "#151515", bg: "#8da3b9", modifiers: "Bold"),
-        inactive_style: (fg: "#a39d9d"),
-    ),
-)
-```
+| Key | Action |
+| --- | --- |
+| Space or p | play or pause |
+| l / h, or the arrow keys | next or previous track |
+| + / - | volume |
+| F3 / F5 | library, search |
+| Enter | open a folder; Alt+Enter adds it to the queue and plays |
+| q | quit |
 
-rmpc rejects an invalid value with an error and falls back to its defaults, so a typo shows up the first time you open it.
+`kew <name>` from a shell plays the folder, artist or song that matches, without opening the library first.
+
+kew publishes what it's playing over MPRIS under the name `kew`, which is how the bar shows the song, and `playerctl -p kew play-pause` controls it from the command line. Covers need a terminal that can draw images; foot does it through sixel, which kew picks automatically.
 
 ## The rest of the desktop
 
