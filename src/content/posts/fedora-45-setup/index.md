@@ -125,7 +125,7 @@ sudo dnf upgrade --refresh
 systemctl reboot
 ```
 
-While you are at it, install git. It's not part of any base group, and part 2 needs it:
+Also install git. It's not part of any base group, and part 2 needs it:
 
 ```bash
 sudo dnf install git
@@ -186,7 +186,7 @@ A BIOS update can wipe the keys you enroll in the next section. Run firmware upd
 
 The RTX 5070 is a Blackwell card, and NVIDIA only supports Blackwell with its open kernel modules ([NVIDIA README](https://download.nvidia.com/XFree86/Linux-x86_64/615.78.08/README/kernel_open.html)). RPM Fusion's `akmod-nvidia` already uses the open modules by default, so there is no extra package or option to set.
 
-`akmods` builds the kernel module on your machine, and rebuilds it every time a new kernel arrives. With Secure Boot on, the firmware refuses modules that aren't signed by a key it trusts, and you end up with a black screen or software rendering. So the order matters: create a signing key and enroll it in the firmware first, then install the driver. From then on akmods signs every build automatically.
+`akmods` builds the kernel module on your machine, and rebuilds it every time a new kernel arrives. With Secure Boot on, the firmware refuses modules that aren't signed by a key it trusts, and you end up with a black screen or software rendering. So create a signing key and enroll it in the firmware first, then install the driver. From then on akmods signs every build automatically.
 
 ### Enroll a MOK key for Secure Boot
 

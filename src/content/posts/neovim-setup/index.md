@@ -260,7 +260,7 @@ return {
 
 ## Language servers
 
-Since 0.11, Neovim configures and starts language servers by itself: `vim.lsp.config` describes a server and `vim.lsp.enable` turns it on for its filetypes. Two plugins fill the gaps. [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) is now just a collection of server definitions (the command, the filetypes, how to find the project root) that `vim.lsp.enable` reads by name. mason.nvim installs the binaries and puts them on Neovim's `PATH`.
+Since 0.11, Neovim configures and starts language servers by itself: `vim.lsp.config` describes a server and `vim.lsp.enable` turns it on for its filetypes. Two plugins fill the gaps. [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) is now only a collection of server definitions (the command, the filetypes, how to find the project root) that `vim.lsp.enable` reads by name. mason.nvim installs the binaries and puts them on Neovim's `PATH`.
 
 | Language | Server | Notes |
 | --- | --- | --- |

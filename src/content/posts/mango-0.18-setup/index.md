@@ -683,7 +683,7 @@ For windowed games, Super+Shift+i kills swayidle, which stops both the lock and 
 
 ### Screen sharing
 
-Mango's package ships `/usr/share/xdg-desktop-portal/mango-portals.conf`, which sends screenshots and screen sharing to the wlr portal and everything else, including the dark-mode setting, to the GTK one. There's nothing to change there. What the wlr portal does need is a way to ask which monitor or window to share; without one, sharing fails without an error. I use wmenu, and cap the stream at 60 fps so the 240 Hz monitor doesn't send four times what a video call can use:
+Mango's package ships `/usr/share/xdg-desktop-portal/mango-portals.conf`, which sends screenshots and screen sharing to the wlr portal and everything else, including the dark-mode setting, to the GTK one. There's nothing to change there, but the wlr portal needs a way to ask which monitor or window to share; without one, sharing fails without an error. I use wmenu, and cap the stream at 60 fps so the 240 Hz monitor doesn't send four times what a video call can use:
 
 ```ini title="~/dotfiles/xdpw/.config/xdg-desktop-portal-wlr/config"
 [screencast]
@@ -818,7 +818,7 @@ Steam's launch options for a game take these tools as prefixes before `%command%
 
 Inside gamescope, use its `--mangoapp` flag instead of `mangohud`.
 
-For VRR, the `vrr_only_fullscreen` rule enables adaptive sync on a monitor while a window is fullscreen there and disables it when the window leaves fullscreen. On NVIDIA there is a catch: the driver's README says its KMS implementation "forces all VRR capable displays into VRR mode by default", so the monitor may run in VRR mode on the desktop too, whatever Mango asks for. Watch the refresh rate counter in the monitor's on-screen menu: if it moves around on the desktop, the driver is doing it. The `conceal_vrr_caps=1` option of the `nvidia_modeset` module stops that, but it hides VRR from Mango as well, so games lose it too.
+For VRR, the `vrr_only_fullscreen` rule enables adaptive sync on a monitor while a window is fullscreen there and disables it when the window leaves fullscreen. On NVIDIA, the driver's README says its KMS implementation "forces all VRR capable displays into VRR mode by default", so the monitor may run in VRR mode on the desktop too, whatever Mango asks for. Watch the refresh rate counter in the monitor's on-screen menu: if it moves around on the desktop, the driver is doing it. The `conceal_vrr_caps=1` option of the `nvidia_modeset` module stops that, but it hides VRR from Mango as well, so games lose it too.
 
 ## Where this leaves you
 

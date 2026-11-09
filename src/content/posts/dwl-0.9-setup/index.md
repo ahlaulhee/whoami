@@ -60,7 +60,7 @@ stow --no-folding -d ~/dotfiles -t ~ fonts foot kanshi mako portal swaylock xdpw
 
 Without `--no-folding`, Stow links whole directories when it can, so `~/.config/foot` itself would point into the repo, and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files.
 
-Leave `dwl`, `slstatus` and `bin` out of that list. They are source trees and scripts, not configs for your home directory.
+Leave `dwl`, `slstatus` and `bin` out of that list. They hold source trees and scripts that Stow shouldn't link into your home directory.
 
 ## Build dwl 0.9
 
