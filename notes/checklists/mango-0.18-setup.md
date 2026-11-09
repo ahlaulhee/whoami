@@ -17,4 +17,5 @@ Only the real machine can confirm:
 - Keybinds are a proposal carried over from the dwl draft; adjust to yours.
 - Keyboard: Super+space switches us/latam (verified headless with `mmsg get keyboardlayout`); check dead keys and AltGr on the real keyboard, and that binds still fire on latam.
 - Firefox: check `about:support` for hardware video decoding. The nvidia-vaapi-driver README lists `media.hardware-video-decoding.force-enabled=true` and `MOZ_DISABLE_RDD_SANDBOX=1` (maybe `LIBVA_DRIVER_NAME=nvidia`); add to the article only what turns out to be needed.
+- fish: verified in WSL as a fresh user (Stow, login shell, `fisher update` with the three plugins, pure prompt with git state, 3 s duration, jobs and green/red ❯, `ansi` bat theme). On the desktop: icons in `ll`, fzf.fish keys in foot (Ctrl+Alt+F/L/S/P don't collide with anything in Mango), and that foot/tmux open fish after relogin.
 - Screenshots: desktop with the bar, scroller with several windows, kew.

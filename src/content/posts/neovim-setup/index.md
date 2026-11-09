@@ -20,7 +20,7 @@ Neovim 0.12 is in Fedora 45, and so is every compiler and runtime the language s
 
 ```bash
 sudo dnf install neovim tmux git gcc make unzip ripgrep fd-find tree-sitter-cli wl-clipboard \
-  nodejs npm golang dotnet-sdk-10.0 python3 uv nerdfontssymbolsonly-nerd-fonts
+  nodejs npm golang dotnet-sdk-10.0 python3 uv
 ```
 
 | Package | Why |
@@ -33,9 +33,8 @@ sudo dnf install neovim tmux git gcc make unzip ripgrep fd-find tree-sitter-cli 
 | `dotnet-sdk-10.0` | runs the Roslyn server and csharpier, and builds your C# projects |
 | `python3`, `uv` | basedpyright and ruff, and your Python projects |
 | `unzip` | mason unpacks several downloads with it |
-| `nerdfontssymbolsonly-nerd-fonts` | the icons in the file tree, statusline and completion menu (from Terra, set up in part 2) |
 
-Maple Mono, the terminal font from part 2, has no icon glyphs. The symbols-only Nerd Font fills that gap: foot finds it through fontconfig and uses it for any character Maple Mono lacks, so icons render without switching to a patched version of the font.
+The icons in the file tree, statusline and completion menu come from the symbols-only Nerd Font installed in part 2, next to Maple Mono.
 
 The servers, formatters and linters themselves come from [mason.nvim](https://github.com/mason-org/mason.nvim), which installs them into Neovim's data directory, so they stay at the versions the config expects regardless of what Fedora ships.
 

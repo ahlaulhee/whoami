@@ -1,10 +1,10 @@
 ---
 slug: mango-0.18-setup
 title: Building a Mango desktop on Fedora 45
-description: Mango 0.18 with the scrolling layout on every tag, a Quickshell status bar, kew for music, greetd, both monitors at full refresh, and Steam on NVIDIA.
+description: Mango 0.18 with the scrolling layout on every tag, a Quickshell status bar, kew for music, greetd, fish with the pure prompt, both monitors at full refresh, and Steam on NVIDIA.
 pubDate: 2026-11-08
-tags: [mango, wayland, quickshell, fedora, nvidia, gaming]
-testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, akmod-nvidia 615.78, RTX 5070]
+tags: [mango, wayland, quickshell, fish, fedora, nvidia, gaming]
+testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, fish 4.6, akmod-nvidia 615.78, RTX 5070]
 series:
   name: Fedora 45 + Mango from scratch
   part: 2
@@ -33,6 +33,7 @@ All the configuration lives in one git repository, `~/dotfiles`. Each program ge
 ```txt
 ~/dotfiles
 ├── bin/mango-idle                     # copied to /usr/local/bin
+├── fish/.config/fish/{config.fish,fish_plugins}
 ├── fonts/.local/share/fonts/maple-mono/
 ├── foot/.config/foot/foot.ini
 ├── kew/.config/kew/themes/paradise.theme
@@ -52,7 +53,7 @@ git init ~/dotfiles
 Once the files exist, link them by naming the folders:
 
 ```bash
-stow --no-folding -d ~/dotfiles -t ~ fonts foot kew mako mango quickshell swaylock xdpw zathura
+stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mako mango quickshell swaylock xdpw zathura
 ```
 
 Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` stays out of the list; its script is copied to `/usr/local/bin`.
@@ -722,6 +723,119 @@ fc-match "Maple Mono"
 
 The last command should print `MapleMono-Regular.ttf: "Maple Mono" "Regular"`. The bar, foot, wmenu, mako and swaylock all find it by that name. In foot the cursive italic shows up, but the ligatures don't: `->` and `!=` stay as separate characters.
 
+Maple Mono has no icon glyphs, and eza, Neovim's file tree and statusline use them. The symbols-only Nerd Font from Terra fills that gap: foot finds it through fontconfig and uses it for any character Maple Mono lacks, so there's no need for a patched copy of the font:
+
+```bash
+sudo dnf install nerdfontssymbolsonly-nerd-fonts
+```
+
+## The shell: fish
+
+I use [fish](https://fishshell.com/) with the [pure](https://github.com/pure-fish/pure) prompt, [fzf.fish](https://github.com/PatrickF1/fzf.fish) for fuzzy search, and a few tools that replace the classic commands:
+
+```bash
+sudo dnf install fish fzf fd-find bat eza zoxide ripgrep
+```
+
+| Package | Role |
+| --- | --- |
+| `fish` | the shell |
+| `fzf`, `fd-find` | the fuzzy finder, and the file search fzf.fish runs |
+| `bat` | `cat` with syntax highlighting; fzf.fish previews files with it |
+| `eza` | `ls` with icons and git status |
+| `zoxide` | `z` jumps to directories you visit often, `zi` picks one with fzf |
+| `ripgrep` | `rg`, a faster grep |
+
+The config is a Stow package with two files. `fish_plugins` lists the plugins for [fisher](https://github.com/jorgebucaran/fisher), fish's plugin manager, fisher included:
+
+```txt title="~/dotfiles/fish/.config/fish/fish_plugins"
+jorgebucaran/fisher
+pure-fish/pure
+patrickf1/fzf.fish
+```
+
+```fish title="~/dotfiles/fish/.config/fish/config.fish"
+if status is-interactive
+    # pure prompt: counts next to the git arrows, background jobs, the
+    # duration of commands that take 2 s or more, and a green ❯
+    set -g pure_show_numbered_git_indicator true
+    set -g pure_show_jobs true
+    set -g pure_threshold_command_duration 2
+    set -g pure_color_success green
+
+    # z/zi jump to frequent directories; cd stays untouched
+    zoxide init fish | source
+
+    # bat and fzf use the terminal's 16 colors, so they follow foot's palette
+    set -gx BAT_THEME ansi
+    set -gx FZF_DEFAULT_OPTS --color=16
+
+    # bat
+    alias cat 'bat --paging=never'
+
+    # eza
+    alias ls 'eza --icons --group-directories-first'
+    alias ll 'eza --icons --group-directories-first -l --git'
+    alias la 'eza --icons --group-directories-first -la --git'
+    alias lt 'eza --icons --group-directories-first --tree'
+
+    # git
+    alias g git
+    alias gs 'git status'
+    alias ga 'git add'
+    alias gaa 'git add --all'
+    alias gc 'git commit'
+    alias gcm 'git commit -m'
+    alias gp 'git push'
+    alias gpl 'git pull'
+    alias gl 'git log --oneline --graph --decorate'
+    alias gd 'git diff'
+    alias gco 'git checkout'
+    alias gb 'git branch'
+
+    # nvim
+    alias vim nvim
+    alias vi nvim
+    alias v nvim
+
+    # extras
+    alias grep rg
+    alias rm 'rm -i'
+    alias cp 'cp -i'
+    alias mv 'mv -i'
+end
+```
+
+The aliases only exist in interactive shells, so scripts still get the real `cat`, `ls` and `grep`. pure, fish's syntax highlighting and eza use the terminal's named colors, and the two variables do the same for bat and fzf, so all of them take their colors from foot's Paradise palette.
+
+Link the package and make fish your login shell:
+
+```bash
+stow --no-folding -d ~/dotfiles -t ~ fish
+chsh -s /usr/bin/fish
+```
+
+Log out and back in. greetd still starts Mango through `/bin/sh` and `/etc/profile`, so the session's environment stays the same, and foot and tmux open fish because they start your login shell. Then, in fish, fetch fisher and let it install everything in `fish_plugins`:
+
+```fish
+curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher update
+```
+
+fisher puts the plugins' files in `~/.config/fish` as regular files, outside the repo; on another machine the same command installs them again from `fish_plugins`.
+
+The prompt shows the directory and the git branch on one line, with `*` when the tree has uncommitted changes, `⇡2` or `⇣1` when you're ahead of or behind the remote, and how long the last command took if it ran for 2 s or more. `❯` sits on the line below, green after a command that succeeded and red after one that failed, with the number of background jobs in front of it when there are any.
+
+| Keys | Action (fzf.fish) |
+| --- | --- |
+| Ctrl+R | search the command history |
+| Ctrl+Alt+F | search files below the current directory |
+| Ctrl+Alt+L | search the git log |
+| Ctrl+Alt+S | search `git status` |
+| Ctrl+Alt+P | search running processes |
+| Ctrl+V | search shell variables |
+
+Ctrl+V replaces fish's own paste binding; in foot, Ctrl+Shift+V pastes.
+
 ## Paradise everywhere
 
 Mango's borders, the bar and the launcher get their colors from the files above. The other programs read their own config files.
@@ -830,6 +944,6 @@ For VRR, the `vrr_only_fullscreen` rule enables adaptive sync on a monitor while
 
 ## Where this leaves you
 
-Mango starts from greetd with both monitors at their full refresh rate and every tag scrolling, the Quickshell bar shows tags, the focused window, music, volume and the tray, and the tools around it share one palette and one font. All of it lives in `~/dotfiles` as Stow packages, with Mango itself kept up to date by dnf.
+Mango starts from greetd with both monitors at their full refresh rate and every tag scrolling, the Quickshell bar shows tags, the focused window, music, volume and the tray, foot opens fish with the pure prompt, and the tools around it share one palette and one font. All of it lives in `~/dotfiles` as Stow packages, with Mango itself kept up to date by dnf.
 
 Part 3 covers my Neovim config.
