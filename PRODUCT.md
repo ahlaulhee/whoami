@@ -12,7 +12,7 @@ Astro, sitio estático, desplegado en Cloudflare Pages (`ahlaulhee.pages.dev`; `
 
 ## Users
 
-- Usuarios de Linux, en inglés, que quieren reproducir un setup concreto: Fedora 45 mínimo, NVIDIA, dwl con patches, Neovim. Leen con la terminal abierta al lado y copian comandos.
+- Usuarios de Linux, en inglés, que quieren reproducir un setup concreto: Fedora 45 mínimo, NVIDIA, Mango (compositor con scroll basado en dwl) con barra en Quickshell, Neovim. Leen con la terminal abierta al lado y copian comandos.
 - Visitantes de la página personal de Alex: about, proyectos, links.
 
 ## Product Purpose
@@ -21,7 +21,7 @@ Sitio personal de Alex Laulhe: blog de guías de configuración probadas en su e
 
 ## Positioning
 
-Guías sacadas de un equipo de uso diario real (RTX 5070, dos monitores VRR, dwl 0.9 con patches), con URL versionada, sello "Tested on" y enlaces a un commit fijo de los dotfiles.
+Guías sacadas de un equipo de uso diario real (RTX 5070, dos monitores VRR, Mango 0.18), con URL versionada, sello "Tested on" y enlaces a un commit fijo de los dotfiles.
 
 ## Capabilities and Constraints
 
@@ -38,7 +38,7 @@ Guías sacadas de un equipo de uso diario real (RTX 5070, dos monitores VRR, dwl
 ## Evidence on Hand
 
 - Copy del portafolio actual, proyecto WTTG3 Assistant, GitHub @ahlaulhee, la marca ASCII "ahl" (generada por `scripts/gen-ascii.js`).
-- No hay artículos escritos: el texto de Fedora y dwl lo escribe Alex; no se inventa. El de Neovim se publica como "Work in progress".
+- Artículos de Fedora y Mango basados en investigación verificada (notes/research/); lo que solo se puede comprobar en la máquina real está en notes/checklists/. El de Neovim se publica como "Work in progress". La guía de dwl quedó como borrador.
 
 ## Product Principles
 

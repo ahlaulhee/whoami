@@ -6,12 +6,12 @@ pubDate: 2026-11-08
 tags: [fedora, nvidia]
 testedOn: [Fedora 45, kernel 7.2, akmod-nvidia 615.78, RTX 5070]
 series:
-  name: Fedora 45 + dwl from scratch
+  name: Fedora 45 + Mango from scratch
   part: 1
 draft: false
 ---
 
-This is the base for the rest of the series: a Fedora 45 install with no desktop environment, every package source I use enabled, and the NVIDIA driver loaded with Secure Boot still on. It ends at a text console. Part 2 builds the dwl desktop on top of it.
+This is the base for the rest of the series: a Fedora 45 install with no desktop environment, every package source I use enabled, and the NVIDIA driver loaded with Secure Boot still on. It ends at a text console. Part 2 builds the Mango desktop on top of it.
 
 ## Before you start
 
@@ -310,4 +310,4 @@ vainfo --display drm
 
 You have a Fedora 45 system with no desktop, RPM Fusion and the full codecs installed, firmware up to date, and the NVIDIA driver loaded and signed for Secure Boot. Every new kernel gets its module rebuilt and signed by akmods without you doing anything.
 
-Part 2 starts from this console and builds dwl, a Wayland compositor, with my patches, a status bar and the rest of the desktop around it.
+Part 2 starts from this console and builds the desktop: Mango, a scrolling Wayland compositor based on dwl, with a Quickshell status bar and the tools around it.

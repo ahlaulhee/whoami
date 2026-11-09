@@ -7,7 +7,7 @@ related_targets: ["src/pages/index.astro","src/pages/blog/index.astro"]
 
 Scope: whole site (home, blog index, article, tag pages). Visitor mode: Read for articles and blog index; home is a personal page whose job is to route to articles and identify Alex.
 
-Audience/job: English-speaking Linux users reproducing Fedora 45 + dwl + Neovim setups with a terminal beside the browser; they scan for the next command, copy it, and check whether the guide matches their versions.
+Audience/job: English-speaking Linux users reproducing Fedora 45 + Mango + Neovim setups with a terminal beside the browser; they scan for the next command, copy it, and check whether the guide matches their versions.
 
 seed: none (direction pinned by user: Spectre-inspired, Paradise palette, Geist + Geist Mono, dark only)
 

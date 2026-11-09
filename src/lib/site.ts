@@ -3,7 +3,7 @@ export const SITE = {
   name: 'Alex Laulhe',
   role: 'dev',
   location: 'Córdoba, Argentina',
-  description: 'Setup guides from my own machine: Fedora, dwl, Neovim. Each one says which versions it was tested on.',
+  description: 'Setup guides from my own machine: Fedora, Mango, Neovim. Each one says which versions it was tested on.',
   github: 'https://github.com/ahlaulhee',
 };
 

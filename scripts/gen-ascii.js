@@ -148,7 +148,7 @@ async function writeOg() {
     ctx.fillText('Alex Laulhe · setup guides', 124, 150 + raster.h * scale + 70);
     ctx.font = '34px "Geist OG"';
     ctx.fillStyle = PALETTE.muted;
-    ctx.fillText('Fedora, dwl, Neovim · Córdoba, Argentina', 124, 150 + raster.h * scale + 122);
+    ctx.fillText('Fedora, Mango, Neovim · Córdoba, Argentina', 124, 150 + raster.h * scale + 122);
   });
   return cells.length;
 }
