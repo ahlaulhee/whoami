@@ -9,4 +9,6 @@ Only the real machine can confirm:
 - `<Tab>` vs `<C-i>` distinct inside tmux in foot (extended-keys settings load, behaviour untested).
 - Clipboard: yank in Neovim → paste in another app (wl-clipboard) and tmux copy mode `y` → paste.
 - Keymaps: carried over from github.com/ahlaulhee/neovim; adjust to taste.
+- opencode: sign in to a provider, send one message in the TUI, then `<leader>aa` from Neovim; edit permission diffs (`da`/`dr`) and auto-reload of edited files. In WSL the connection and context strings were verified up to sending (no prompt sent to avoid starting a model run).
+- codediff: review loop with real agent changes; stage/discard hunk keys `<leader>gs`/`<leader>gr` inside the view.
 - Screenshot for the article: tmux with nvim + neo-tree, picker, completion menu.

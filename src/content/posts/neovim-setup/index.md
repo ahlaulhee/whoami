@@ -1,10 +1,10 @@
 ---
 slug: neovim-setup
 title: My Neovim config
-description: Neovim 0.12 on Fedora 45 with native LSP for .NET, TypeScript/React, Go, Lua and Python, blink.cmp, conform, nvim-lint, mini.nvim, neo-tree and vague.nvim, used inside tmux.
+description: Neovim 0.12 on Fedora 45 with native LSP for .NET, TypeScript/React, Go, Lua and Python, blink.cmp, conform, nvim-lint, mini.nvim, neo-tree and vague.nvim, used inside tmux next to a coding agent.
 pubDate: 2026-11-08
-tags: [neovim, tmux, lsp, dotnet, typescript, go, python, lua]
-testedOn: [Fedora 45, Neovim 0.12.6, tmux 3.8, .NET SDK 10, Node.js 22, Go 1.27, Python 3.15]
+tags: [neovim, tmux, lsp, dotnet, typescript, go, python, lua, opencode]
+testedOn: [Fedora 45, Neovim 0.12.6, tmux 3.8, opencode 2.2.6, .NET SDK 10, Node.js 22, Go 1.27, Python 3.15]
 series:
   name: Fedora 45 + Mango from scratch
   part: 3
@@ -56,8 +56,10 @@ The config is two Stow packages in the same `~/dotfiles` repository as the rest 
 │       │   ├── autocmds.lua
 │       │   └── lazy.lua
 │       └── plugins/
+│           ├── agent.lua
 │           ├── colorscheme.lua
 │           ├── completion.lua
+│           ├── diff.lua
 │           ├── explorer.lua
 │           ├── format.lua
 │           ├── git.lua
@@ -127,6 +129,11 @@ o.mouse = "a"
 o.updatetime = 250
 o.timeoutlen = 300
 
+-- Reload files changed on disk (by an agent in another tmux pane) when the
+-- buffer has no unsaved edits. Already the default; explicit because the
+-- checktime autocmd relies on it.
+o.autoread = true
+
 -- System clipboard through wl-clipboard. Scheduled because detecting the
 -- clipboard provider costs startup time.
 vim.schedule(function()
@@ -190,6 +197,18 @@ vim.api.nvim_create_autocmd("TextYankPost", {
   group = augroup,
   callback = function()
     vim.hl.on_yank()
+  end,
+})
+
+-- 'autoread' only acts when timestamps are checked. Neovim does that when it
+-- regains focus; this also checks when idle or switching buffers, so edits by
+-- any agent show up while Neovim keeps the focus.
+vim.api.nvim_create_autocmd({ "CursorHold", "BufEnter" }, {
+  group = augroup,
+  callback = function()
+    if vim.fn.getcmdwintype() == "" then -- :checktime is not allowed in the cmdline window
+      vim.cmd.checktime()
+    end
   end,
 })
 ```
@@ -625,6 +644,8 @@ return {
       clues = {
         { mode = "n", keys = "<Leader>s", desc = "+Search" },
         { mode = "n", keys = "<Leader>g", desc = "+Git" },
+        { mode = { "n", "x" }, keys = "<Leader>a", desc = "+Agent (opencode)" },
+        { mode = { "n", "x" }, keys = "<Leader>d", desc = "+Diff review" },
         clue.gen_clues.square_brackets(),
         clue.gen_clues.builtin_completion(),
         clue.gen_clues.g(),
@@ -746,6 +767,10 @@ bind % split-window -h -c "#{pane_current_path}"
 bind '"' split-window -v -c "#{pane_current_path}"
 bind c new-window -c "#{pane_current_path}"
 
+# prefix o: opencode in a split to the right, in the current pane's directory
+# (replaces the default "next pane"; C-h/j/k/l already move between panes).
+bind o split-window -h -c "#{pane_current_path}" opencode
+
 bind r source-file ~/.config/tmux/tmux.conf \; display "tmux.conf reloaded"
 
 # Smart pane switching with awareness of Vim splits.
@@ -815,6 +840,118 @@ return {
 
 So `C-h/j/k/l` moves between Neovim splits and tmux panes as if they were one grid, and `C-a v` / `C-a h` split the tmux window the same way `<leader>v` / `<leader>h` split Neovim. `C-a d` detaches; `tmux attach` brings the session back with everything still running.
 
+## Working with a coding agent
+
+Most days a coding agent runs in a tmux pane next to Neovim. It edits files in the project; I read what it changed, keep the parts I want and throw away the rest, and send it more context from the editor. Two plugins make that comfortable: [codediff.nvim](https://github.com/esmuellert/codediff.nvim) for reviewing changes, which works with any agent because it only reads git, and [opencode.nvim](https://github.com/nickjvandyke/opencode.nvim) for talking to [opencode](https://opencode.ai/) from Neovim.
+
+### opencode
+
+Terra has two opencode packages that both install `/usr/bin/opencode`: `opencode` is the older 1.x line, and `opencode-cli` is version 2, which opencode.nvim needs:
+
+```bash
+sudo dnf install opencode-cli
+```
+
+`prefix o` in the tmux config above opens it in a split to the right, in the current directory. Pick a model and sign in to a provider inside opencode the first time; which one is up to you. The opencode TUI needs one message in the project before Neovim can send anything to it, because the plugin attaches to an existing session.
+
+All opencode 2 clients share one background service per user, which writes its address to `~/.local/state/opencode/service.json`. opencode.nvim reads that file, so it finds the opencode running in the other pane without a port or any configuration:
+
+```lua title="~/dotfiles/nvim/.config/nvim/lua/plugins/agent.lua"
+local function oc(fn, ...)
+  local args = { ... }
+  return function()
+    return require("opencode")[fn](unpack(args))
+  end
+end
+
+local nx = { "n", "x" }
+
+return {
+  "nickjvandyke/opencode.nvim",
+  -- main branch targets opencode 2; pinned by lazy-lock.json.
+  keys = {
+    { "<leader>aa", oc("ask", "@this: "), mode = nx, desc = "Ask about @this (cursor/selection)" },
+    { "<leader>ab", oc("ask", "@buffer: "), desc = "Ask about @buffer" },
+    { "<leader>ad", oc("ask", "@diagnostics: "), mode = nx, desc = "Ask about @diagnostics" },
+    { "<leader>as", oc("select"), mode = nx, desc = "Select prompt/command" },
+    -- Operator: <leader>ao{motion} (or a visual selection) appends the range to
+    -- opencode's prompt without asking; dot-repeatable.
+    { "<leader>ao", oc("operator", "@this"), mode = nx, expr = true, desc = "Send range (motion)" },
+    {
+      "<leader>al",
+      function()
+        return require("opencode").operator("@this") .. "_"
+      end,
+      expr = true,
+      desc = "Send line",
+    },
+  },
+  init = function()
+    ---@type opencode.Opts
+    vim.g.opencode_opts = {
+      server = {
+        -- Called when no opencode is running: open it in a tmux split next to
+        -- Neovim (focus stays here), the same as tmux prefix o.
+        start = function()
+          if vim.env.TMUX then
+            vim.system({ "tmux", "split-window", "-h", "-d", "-c", vim.fn.getcwd(), "opencode" })
+          else
+            vim.cmd("vsplit term://opencode | wincmd p")
+          end
+        end,
+      },
+    }
+  end,
+}
+```
+
+`<leader>aa` asks a question about the code under the cursor or the selection: the prompt starts with a reference like `src/app.ts:L12-L20` that opencode resolves to the code. `<leader>ab` does the same for the whole buffer, `<leader>ad` for the diagnostics, and `<leader>ao` adds a range to opencode's prompt without asking anything yet, so you can collect several pieces before writing the question. When opencode wants to edit a file, the plugin shows the proposed change as a diff in Neovim; `da` accepts it and `dr` rejects it. Files opencode changes reload by themselves, and the `checktime` autocmd above does the same for any other agent.
+
+opencode.nvim can use snacks.nvim for nicer input boxes, but doesn't need it: without snacks it asks through Neovim's own input and picks through `vim.ui.select`, which mini.pick provides.
+
+### Reviewing changes with codediff
+
+codediff opens a tab with a VS Code style diff and a tree of every changed file, and keeps both up to date while the agent works: a file the agent creates appears in the tree within a few seconds.
+
+```lua title="~/dotfiles/nvim/.config/nvim/lua/plugins/diff.lua"
+-- In the view: ]c/[c hunks, ]f/[f files, - stage/unstage file, S/U stage/unstage
+-- all, X discard file, t inline/side-by-side, gf open file, q close, g? help.
+return {
+  "esmuellert/codediff.nvim",
+  cmd = "CodeDiff",
+  keys = {
+    { "<leader>dd", "<cmd>CodeDiff<CR>", desc = "Review working tree changes" },
+    { "<leader>ds", "<cmd>CodeDiff --staged<CR>", desc = "Review staged changes" },
+    { "<leader>df", "<cmd>CodeDiff file HEAD<CR>", desc = "Diff file vs HEAD" },
+    { "<leader>dh", "<cmd>CodeDiff history %<CR>", desc = "File history" },
+    { "<leader>dh", ":CodeDiff history<CR>", mode = "x", desc = "Selected lines history" },
+    { "<leader>dH", "<cmd>CodeDiff history<CR>", desc = "Repo history" },
+  },
+  opts = {
+    keymaps = {
+      view = {
+        -- Defaults are <leader>hs/hu/hr, which would shadow <leader>h (split)
+        -- inside the diff tab; reuse gitsigns' <leader>g hunk keys instead.
+        stage_hunk = "<leader>gs",
+        unstage_hunk = "<leader>gu",
+        discard_hunk = "<leader>gr",
+      },
+    },
+  },
+}
+```
+
+codediff computes diffs with a native library (`libvscode_diff`) that it downloads into its plugin folder the first time you open a diff, or when you run `:CodeDiff install`, so there's nothing to build. Inside the review tab its own keys take over a few of mine on those buffers (`<leader>e`, `q`, `t`, `-`); they come back when the tab closes.
+
+My review loop after the agent says it's done:
+
+1. `<leader>dd` opens the review tab with every changed file.
+2. `]f` / `[f` move between files and `]c` / `[c` between hunks. `t` switches between side-by-side and inline.
+3. `<leader>gs` stages a hunk I want to keep and `<leader>gr` discards one I don't; `-` stages a whole file and `X` discards it.
+4. `q` closes the tab, and I commit what's staged or ask the agent to redo the rest.
+
+`<leader>dh` shows the history of the current file, or of the selected lines in visual mode, which is the quickest way to see when and why a block changed. All of this reads git only, so it works the same with omp, Claude Code or any other agent running in the other pane.
+
 ## First start
 
 Open Neovim once and let it fill in:
@@ -852,3 +989,8 @@ Leader is Space. Besides the editor keymaps at the top:
 | `<leader>gs` / `gr` / `gp` / `gb` | stage, reset, preview hunk; blame line |
 | `C-h/j/k/l` | move between splits and tmux panes |
 | `<C-y>`, `<C-n>`/`<C-p>`, `<C-space>` | accept, select, open completion |
+| `<leader>aa` / `ab` / `ad` | ask opencode about the cursor or selection / the buffer / the diagnostics |
+| `<leader>ao{motion}`, `<leader>al` | add a range / the current line to opencode's prompt |
+| `<leader>as` | pick an opencode prompt or command |
+| `<leader>dd` / `ds` / `df` | review working tree / staged changes / current file vs HEAD |
+| `<leader>dh` / `dH` | history of the file (or selected lines) / the repo |
