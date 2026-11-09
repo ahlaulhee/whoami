@@ -13,14 +13,6 @@ draft: false
 
 This is the base for the rest of the series: a Fedora 45 install with no desktop environment, every package source I use enabled, and the NVIDIA driver loaded with Secure Boot still on. It ends at a text console. Part 2 builds the Mango desktop on top of it.
 
-## Before you start
-
-My machine has an RTX 5070 and two monitors. Everything NVIDIA-specific here assumes a Turing or newer card (GTX 16 series, RTX 20 series and later). Older cards need a different driver branch; the [RPM Fusion NVIDIA page](https://rpmfusion.org/Howto/NVIDIA) lists which one.
-
-The netinstall image downloads every package during the installation, so plug in Ethernet if you can. Wi-Fi works too, as long as you pick the NetworkManager add-on described below.
-
-Leave Secure Boot on in the firmware settings. The driver section shows how to sign the module so the firmware accepts it.
-
 ## Download and verify the ISO
 
 Fedora Everything is on the [Fedora "misc" downloads page](https://fedoraproject.org/misc/#everything). For x86_64 you want the netinstall ISO and its `CHECKSUM` file:
@@ -82,24 +74,12 @@ Begin the installation, wait for it to download and install everything, and rebo
 
 ## First boot and the console
 
-You land on a text login. Fedora 45 replaced the kernel's old framebuffer console with [kmscon](https://fedoramagazine.org/modernizing-the-console-with-kmscon/), which has proper font rendering, scrollback with Shift+PgUp and zoom with Ctrl and `+`/`-`.
+You land on a text login. Fedora 45 replaced the kernel's old framebuffer console with [kmscon](https://fedoramagazine.org/modernizing-the-console-with-kmscon/).
 
 The old tools for the console don't work under kmscon anymore. `loadkeys` does nothing; set the keyboard layout with `localectl` instead, and kmscon picks it up:
 
 ```bash
 sudo localectl set-keymap us
-```
-
-`setfont` doesn't work either. Fonts and sizes live in `/etc/kmscon/kmscon.conf`. Start from the example file if you want to change them:
-
-```bash
-sudo cp /etc/kmscon/kmscon.conf.example /etc/kmscon/kmscon.conf
-```
-
-`man kmscon.conf` lists the options. To get the old console back on one terminal (tty5 here), mask kmscon there and start a regular getty:
-
-```bash
-sudo systemctl mask kmsconvt@tty5 && sudo systemctl enable --now getty@tty5
 ```
 
 ## Tune dnf5
@@ -166,8 +146,6 @@ sudo dnf swap ffmpeg-free ffmpeg --allowerasing
 sudo dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
 ```
 
-The same page has `mesa-va-drivers-freeworld`, `mesa-vulkan-drivers-freeworld` and the Intel media drivers. Those are for AMD and Intel graphics. On an NVIDIA-only machine, skip them. Hardware video decoding on NVIDIA comes after the driver, further down.
-
 ## Firmware updates with fwupd
 
 `fwupd` came with `core`. It downloads firmware from the [LVFS](https://fwupd.org/) for whatever devices the vendor publishes there: BIOS/UEFI on many boards, SSDs, docks, some peripherals.
@@ -183,6 +161,8 @@ UEFI updates are staged and applied on the next reboot. Fedora's fwupd UEFI bina
 A BIOS update can wipe the keys you enroll in the next section. Run firmware updates before setting up the NVIDIA driver, and keep in mind that you may have to re-enroll the key after future BIOS updates.
 
 ## NVIDIA driver
+
+This section installs the current driver branch, for the GTX 16 series, the RTX 20 series and later cards. Older cards need a legacy branch; the [RPM Fusion NVIDIA page](https://rpmfusion.org/Howto/NVIDIA) lists which one.
 
 The RTX 5070 is a Blackwell card, and NVIDIA only supports Blackwell with its open kernel modules ([NVIDIA README](https://download.nvidia.com/XFree86/Linux-x86_64/615.78.08/README/kernel_open.html)). RPM Fusion's `akmod-nvidia` already uses the open modules by default, so there is no extra package or option to set.
 
@@ -255,15 +235,7 @@ Once `modinfo` prints a version, reboot:
 systemctl reboot
 ```
 
-The package handles the rest. In particular, don't do any of these:
-
-- Don't add `nvidia-drm.modeset=1` to the kernel command line. Modeset is on by default, and RPM Fusion says the parameter now conflicts with Fedora's early-boot display handling.
-- Don't blacklist nouveau yourself. The package puts `rd.driver.blacklist=nouveau,nova_core` on the kernel command line.
-- Don't install `xorg-x11-drv-nvidia-libs.i686` by hand. Fedora pulls in the 32-bit libraries automatically; they matter later for Steam.
-- Don't rebuild the initramfs with `dracut`. RPM Fusion recommends keeping the driver out of it.
-- Don't enable `nvidia-suspend`, `nvidia-resume` and `nvidia-hibernate` by hand. With the open modules the kernel preserves video memory across suspend, and RPM Fusion's units only run when that mechanism is off.
-
-The driver's preset also enables `nvidia-powerd`, which handles Dynamic Boost on laptops. On a desktop it has nothing to do:
+The driver's preset enables `nvidia-powerd`, which handles Dynamic Boost on laptops. On a desktop it has nothing to do:
 
 ```bash
 sudo systemctl disable --now nvidia-powerd
@@ -279,15 +251,6 @@ modinfo -F signer nvidia
 ```
 
 `nvidia-smi` should show the card and the driver version. `lsmod | grep nouveau` should print nothing, `modeset` should be `Y`, and `modinfo -F signer nvidia` should print the name of your akmods key instead of an empty line.
-
-Suspend once to make sure the machine comes back with a working screen:
-
-```bash
-grep UseKernelSuspendNotifiers /proc/driver/nvidia/params
-systemctl suspend
-```
-
-The first line should report `1`, which means the kernel handles video memory during suspend.
 
 ### If it doesn't load
 
