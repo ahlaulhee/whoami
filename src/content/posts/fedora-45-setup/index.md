@@ -121,6 +121,42 @@ sudo firewall-cmd --permanent --remove-service=ssh
 sudo firewall-cmd --reload
 ```
 
+## Mount the shared drives
+
+Besides the Windows system disk, the machine has an SSD and an HDD formatted as NTFS that both systems use: the SSD holds the files I back up, the HDD series, movies and music. The kernel's `ntfs3` driver reads and writes NTFS, so there's nothing to install.
+
+First turn off Fast Startup in Windows: Control Panel, Power Options, "Choose what the power buttons do", untick "Turn on fast startup". With it on, Windows doesn't fully release its drives when it shuts down, and ntfs3 refuses to mount a drive marked as still in use. A Windows crash leaves the same mark; booting Windows and shutting it down normally clears it.
+
+Find the UUID of each drive. NTFS UUIDs are 16 hexadecimal characters:
+
+```bash
+lsblk -f
+```
+
+Create the mount points and open `/etc/fstab`:
+
+```bash
+sudo mkdir -p /mnt/ssd /mnt/hdd
+sudoedit /etc/fstab
+```
+
+Add one line per drive, with your UUIDs:
+
+```ini title="/etc/fstab"
+UUID=0123456789ABCDEF  /mnt/ssd  ntfs3  uid=1000,gid=1000,umask=022,windows_names,nofail  0 0
+UUID=FEDCBA9876543210  /mnt/hdd  ntfs3  uid=1000,gid=1000,umask=022,windows_names,nofail  0 0
+```
+
+NTFS has no Linux owners or permissions, so `uid` and `gid` make every file belong to your user (`id` prints your numbers; the first user gets 1000), and `umask=022` lets only that user write. `windows_names` stops Linux programs from creating names Windows can't open, such as ones containing `:` or `?`. `nofail` lets the boot continue when a drive is missing or won't mount. The type is `ntfs3` and not `ntfs` because Fedora 45's kernel also ships the newer `ntfs` driver from Linux 7.1; `ntfs3` has been in the kernel since 5.15.
+
+systemd turns fstab into mount units, so reload it before mounting:
+
+```bash
+sudo systemctl daemon-reload
+sudo mount -a
+findmnt /mnt/ssd /mnt/hdd
+```
+
 ## Enable RPM Fusion
 
 [RPM Fusion](https://rpmfusion.org/Configuration) has the software Fedora can't ship: the NVIDIA driver, the full ffmpeg, Steam. Install both the free and nonfree repositories:
@@ -271,6 +307,6 @@ vainfo --display drm
 
 ## Where this leaves you
 
-You have a Fedora 45 system with no desktop, RPM Fusion and the full codecs installed, firmware up to date, and the NVIDIA driver loaded and signed for Secure Boot. Every new kernel gets its module rebuilt and signed by akmods without you doing anything.
+You have a Fedora 45 system with no desktop, the shared NTFS drives mounted, RPM Fusion and the full codecs installed, firmware up to date, and the NVIDIA driver loaded and signed for Secure Boot. Every new kernel gets its module rebuilt and signed by akmods without you doing anything.
 
 Part 2 starts from this console and builds the desktop: Mango, a scrolling Wayland compositor based on dwl, with a Quickshell status bar and the tools around it.

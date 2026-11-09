@@ -17,16 +17,14 @@ Mango started as a fork of dwl and keeps its model: tags instead of workspaces, 
 
 ## Install Mango
 
-Mango isn't in Fedora's repositories. Its documentation installs it from [Terra](https://terra.fyralabs.com/), a third-party repository run by Fyra Labs. The first command installs Terra's repository file and signing key; `--nogpgcheck` applies only to that step, and from then on dnf checks every Terra package against the key it just installed:
+Mango isn't in Fedora's repositories. Its documentation installs it from [Terra](https://terra.fyralabs.com/), a third-party repository. The first command installs Terra's repository file and signing key; `--nogpgcheck` applies only to that step, and from then on dnf checks every Terra package against the key it just installed:
 
 ```bash
 sudo dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
 sudo dnf install mangowm xorg-x11-server-Xwayland
 ```
 
-Keep the single quotes: dnf has to expand `$releasever` itself. Mango comes from Terra, but wlroots 0.20 and scenefx 0.5, the two libraries it builds on, come from Fedora. The package doesn't depend on XWayland, which is why it's in the same command; Steam and other X11 programs need it.
-
-The package also installs `mmsg`, the command-line client for Mango's IPC socket that the status bar uses, a session file for login managers, and a portal configuration.
+Mango comes from Terra, but wlroots 0.20 and scenefx 0.5, the two libraries it builds on, come from Fedora. The package doesn't depend on XWayland, which is why it's in the same command; Steam and other X11 programs need it.
 
 ## Dotfiles with GNU Stow
 
@@ -65,7 +63,7 @@ Mango reads `~/.config/mango/config.conf`, one `key=value` per line, and reappli
 
 ### Monitors
 
-`monitor_rule` sets the mode, refresh rate, position and VRR for each output, so kanshi isn't needed. The name is a regular expression, so anchor it. My 24" 1080p monitor is on the left and the 27" 1440p one on the right:
+`monitor_rule` sets the mode, refresh rate, position and VRR for each output. The name is a regular expression, so anchor it. My 24" 1080p monitor is on the left and the 27" 1440p one on the right:
 
 ```ini title="~/dotfiles/mango/.config/mango/config.conf"
 monitor_rule=name:^DP-1$,width:1920,height:1080,refresh:144,x:0,y:0,scale:1,vrr:0
@@ -91,7 +89,7 @@ scroller_prefer_overspread=0
 scroller_focus_center=1
 ```
 
-`tag_rule=id:*` applies the scroller to every tag on both monitors. New windows open at 80% of the screen width, so the neighbouring window always shows at the edge, and the focused one stays centred while you move through the strip. Super+space still switches a tag to `tile` or `monocle` when a scrolling strip isn't what you want.
+`tag_rule=id:*` applies the scroller to every tag on both monitors. New windows open at 80% of the screen width, so the neighbouring window always shows at the edge, and the focused one stays centred while you move through the strip. Super+Shift+space still switches a tag to `tile` or `monocle` when a scrolling strip isn't what you want.
 
 ### Look
 
@@ -140,6 +138,14 @@ window_rule=is_floating:1,app_id:^steam$,title:^(Friends List|Steam Settings)$
 
 The first rule marks foot as the terminal. When a graphical program started from foot opens, it takes the terminal's place, and the terminal comes back when the program exits. The second turns VRR on for any window while it's fullscreen; Mango requires an `app_id` or `title` in every rule, so `.*` stands for all of them. Narrow it to `^(steam_app_.*|gamescope)$` if you'd rather keep fullscreen video at a fixed refresh rate. The third floats Steam's friends list and settings window instead of giving them a column.
 
+### Keyboard layouts
+
+```ini title="~/dotfiles/mango/.config/mango/config.conf"
+xkb_rules_layout=us,latam
+```
+
+US comes first, so it's the layout Mango starts with. Super+space switches to Latin American Spanish and back, and `mmsg get keyboardlayout` prints the active one. `bind` matches the physical key, so the bindings below keep working while latam is active.
+
 ### Keybinds
 
 Bindings are `bind=MODIFIERS,key,dispatcher,arguments`. `spawn` runs a program directly, `spawn_shell` runs the line through a shell for pipes and `$(...)`, and `bindl` keeps working on the lock screen:
@@ -178,7 +184,7 @@ bind=SUPER,s,focuslast,
 bind=SUPER,r,switch_proportion_preset,next
 bind=SUPER,e,set_proportion,1.0
 bind=SUPER,f,togglefullscreen,
-bind=SUPER+SHIFT,space,togglefloating,
+bind=SUPER+SHIFT,f,togglefloating,
 bind=SUPER,q,killclient,
 mousebind=SUPER,btn_left,moveresize,curmove
 mousebind=SUPER,btn_right,moveresize,curresize
@@ -186,7 +192,8 @@ mousebind=SUPER,btn_right,moveresize,curresize
 bind=SUPER,c,setlayout,scroller
 bind=SUPER,t,setlayout,tile
 bind=SUPER,m,setlayout,monocle
-bind=SUPER,space,switch_layout,
+bind=SUPER+SHIFT,space,switch_layout,
+bind=SUPER,space,switch_keyboard_layout,
 bind=SUPER+ALT,0,togglegaps,
 
 bind=SUPER,1,view,1
@@ -213,8 +220,10 @@ bind=SUPER+SHIFT,q,quit
 | Super+e | full width |
 | Super+s | back to the previous window |
 | Super+f | fullscreen |
+| Super+Shift+f | float the window, or tile it again |
 | Super+q | close the window |
-| Super+space | cycle scroller, tile and monocle |
+| Super+space | switch between the US and Latin American layouts |
+| Super+Shift+space | cycle scroller, tile and monocle |
 | Super+1 to 9, Super+Shift+1 to 9 | view a tag, move the window to a tag |
 | Super+comma/period | focus the left or right monitor |
 | Super+n | nnn in a terminal |
@@ -227,8 +236,6 @@ bind=SUPER+SHIFT,q,quit
 | Super+b | show or hide the bar |
 | Super+scroll | volume |
 | Super+Shift+r | reload the config |
-
-`bind` matches the physical key, so the bindings keep working if you add a second keyboard layout. Mango has built-in equivalents for everything the dwl patches did in the earlier version of this guide: swallowing through `is_term`, `focuslast` instead of swapfocus, `warp_cursor` (on by default) instead of warpcursor, centred floating windows, and gaps.
 
 ### Check the config
 
@@ -626,7 +633,7 @@ kew publishes what it's playing over MPRIS under the name `kew`, which is how th
 ## The rest of the desktop
 
 ```bash
-sudo dnf install foot wmenu swaybg mako libnotify swaylock swayidle wlopm \
+sudo dnf install foot wmenu swaybg mako libnotify swaylock swayidle wlopm firefox \
   wl-clipboard cliphist grim slurp grimpicker \
   xdg-desktop-portal-wlr xdg-desktop-portal-gtk lxqt-policykit xdg-user-dirs \
   nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui \
@@ -637,6 +644,7 @@ xdg-user-dirs-update
 | Package | Role |
 | --- | --- |
 | `foot` | terminal |
+| `firefox` | browser |
 | `wmenu` | launcher; `wmenu-run` lists everything in `$PATH` |
 | `swaybg` | background |
 | `mako`, `libnotify` | notifications, and `notify-send` to test them |
@@ -698,7 +706,7 @@ Fedora 45 ships xdg-desktop-portal-wlr 0.8.4, which has two open regressions: th
 
 ## A font for the desktop
 
-The site uses Geist, but on the desktop I use [Maple Mono](https://github.com/subframe7536/maple-font): rounded, with a cursive italic, under the OFL license. It isn't packaged in Fedora, so it goes into the dotfiles as a Stow package. The `TTF` archive has the static weights; check it against the published checksum before unpacking:
+On the desktop I use [Maple Mono](https://github.com/subframe7536/maple-font). It isn't packaged in Fedora, so it goes into the dotfiles as a Stow package. The `TTF` archive has the static weights; check it against the published checksum before unpacking:
 
 ```bash
 mkdir -p ~/dotfiles/fonts/.local/share/fonts/maple-mono

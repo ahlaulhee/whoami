@@ -15,4 +15,6 @@ Only the real machine can confirm:
 - Screen sharing with the wmenu chooser; xdpw 0.8.4 issues #411/#409.
 - Idle: fullscreen game with a controller doesn't lock; video on a hidden tag keeps the screen awake (`idle_inhibit_ignore_visible`, untested); Super+Shift+i toggle.
 - Keybinds are a proposal carried over from the dwl draft; adjust to yours.
+- Keyboard: Super+space switches us/latam (verified headless with `mmsg get keyboardlayout`); check dead keys and AltGr on the real keyboard, and that binds still fire on latam.
+- Firefox: check `about:support` for hardware video decoding. The nvidia-vaapi-driver README lists `media.hardware-video-decoding.force-enabled=true` and `MOZ_DISABLE_RDD_SANDBOX=1` (maybe `LIBVA_DRIVER_NAME=nvidia`); add to the article only what turns out to be needed.
 - Screenshots: desktop with the bar, scroller with several windows, kew.

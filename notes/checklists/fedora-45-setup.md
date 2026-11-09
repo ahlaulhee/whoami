@@ -8,6 +8,7 @@ Follow the article on the real machine, then:
 - Root password: the article now says "I give root a password" (emergency mode needs it). Confirm that's your choice or reword.
 - sshd/firewall step: confirm you want it (article disables sshd and removes the ssh service from firewalld).
 - LUKS + NVIDIA: check the passphrase prompt is visible at boot; if not, old research suggests `plymouth.use-simpledrm=1` (RPM Fusion). Add to the article if needed.
+- Shared NTFS drives: the fstab lines only passed `findmnt --verify` and systemd-fstab-generator in WSL (its kernel has no ntfs3). On the real machine: Fast Startup off, `mount -a`, write a file from Linux and open it in Windows, reboot with each drive unplugged to confirm `nofail`.
 - Check the real output of `mokutil --test-key ...` and `modinfo -F signer nvidia`, and that `vainfo --display drm` works from the TTY (otherwise try `LIBVA_DRIVER_NAME=nvidia vainfo --display drm`).
 - Re-check the ISO file name and SHA256 on https://fedoraproject.org/misc/#everything (the page showed a BETA badge on 2026-11-08).
 - Screenshots next to the article (`./name.png`): software selection screen, MOK Manager, `nvidia-smi`.
