@@ -3,6 +3,7 @@ slug: mango-0.18-setup
 title: Building a Mango desktop on Fedora 45
 description: Mango 0.18 with the scrolling layout on every tag, a Quickshell status bar, kew for music, greetd, fish with the pure prompt, both monitors at full refresh, and Steam on NVIDIA.
 pubDate: 2026-11-08
+updatedDate: 2026-11-09
 tags: [mango, wayland, quickshell, fish, fedora, nvidia, gaming]
 testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, fish 4.6, akmod-nvidia 615.78, RTX 5070]
 series:
@@ -37,7 +38,6 @@ All the configuration lives in one git repository, `~/dotfiles`. Each program ge
 ├── fonts/.local/share/fonts/maple-mono/
 ├── foot/.config/foot/foot.ini
 ├── kew/.config/kew/themes/paradise.theme
-├── mako/.config/mako/config
 ├── mango/.config/mango/config.conf
 ├── quickshell/.config/quickshell/shell.qml
 ├── swaylock/.config/swaylock/config
@@ -53,7 +53,7 @@ git init ~/dotfiles
 Once the files exist, link them by naming the folders:
 
 ```bash
-stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mako mango quickshell swaylock xdpw zathura
+stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mango quickshell swaylock xdpw zathura
 ```
 
 Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` stays out of the list; its script is copied to `/usr/local/bin`.
@@ -120,14 +120,13 @@ The colors are the [Paradise](https://github.com/paradise-theme/paradise) palett
 
 ```ini title="~/dotfiles/mango/.config/mango/config.conf"
 exec_once=swaybg -c 151515
-exec_once=mako
-exec_once=/usr/libexec/lxqt-policykit-agent
+exec_once=wl-clip-persist --clipboard regular
 exec_once=wl-paste --watch cliphist store
 exec_once=/usr/local/bin/mango-idle
 exec_once=qs
 ```
 
-Note the underscore: `exec_once` runs a command once at login, and `exec` runs it again on every reload. Mango exports its environment to systemd and D-Bus and starts a `mango-session.target` by itself, so nothing here does that; the screen-sharing portal finds the session without help. `qs` is Quickshell, the status bar. `mango-idle` is a short script covered in [Locking, screens off, and games](#locking-screens-off-and-games).
+Note the underscore: `exec_once` runs a command once at login, and `exec` runs it again on every reload. Mango exports its environment to systemd and D-Bus and starts a `mango-session.target` by itself, so nothing here does that; the screen-sharing portal finds the session without help. `qs` is Quickshell, which draws the status bar, the volume OSD, the notifications and the polkit password prompt. `wl-clip-persist` keeps what you copied after the program you copied it from closes. `mango-idle` is a short script covered in [Locking, screens off, and games](#locking-screens-off-and-games).
 
 ### Window rules
 
@@ -162,6 +161,7 @@ bind=SUPER+SHIFT,x,spawn,grimpicker --copy --notify
 bind=SUPER,Escape,spawn,swaylock -f
 bind=SUPER+SHIFT,i,spawn_shell,pkill -x swayidle && notify-send 'Idle' 'Lock and screen-off disabled' || { /usr/local/bin/mango-idle & notify-send 'Idle' 'Lock and screen-off enabled'; }
 bind=SUPER,b,spawn,qs ipc call bar toggle
+bind=SUPER,o,spawn,qs ipc call audio next
 
 bindl=NONE,XF86AudioRaiseVolume,spawn,wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
 bindl=NONE,XF86AudioLowerVolume,spawn,wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
@@ -235,6 +235,7 @@ bind=SUPER+SHIFT,q,quit
 | Super+Escape | lock the screen |
 | Super+Shift+i | turn the automatic lock and screen-off off or back on |
 | Super+b | show or hide the bar |
+| Super+o | switch to the next audio output |
 | Super+scroll | volume |
 | Super+Shift+r | reload the config |
 
@@ -278,9 +279,14 @@ sudo systemctl enable greetd.service
 sudo systemctl set-default graphical.target
 ```
 
-## The status bar in Quickshell
+## Quickshell: bar, OSD, notifications and polkit
 
-Quickshell is a toolkit for writing desktop shells in QML, the declarative language Qt uses for interfaces. A bar is one QML file that Quickshell reloads every time you save it. Mine sits docked along the top of each monitor, from one corner to the other, with the tags on the left, the focused window's title in the middle, and the current song, volume, microphone, date and the system tray on the right.
+Quickshell is a toolkit for writing desktop shells in QML, the declarative language Qt uses for interfaces. The whole shell is one QML file that Quickshell reloads every time you save it. Mine has four parts:
+
+- A bar docked along the top of each monitor, from one corner to the other, with the tags on the left, the focused window's title in the middle, and the current song, volume, microphone, date and the system tray on the right. Right-clicking the volume lists the audio outputs.
+- A volume OSD, a small box that shows the output, a level bar and the percentage for a moment whenever the volume changes.
+- Notification popups, instead of mako.
+- The password prompt for programs that ask polkit for privileges, instead of lxqt-policykit.
 
 Fedora 45 has Quickshell, but its package is a February 2026 snapshot from before version 0.3. The [errornointernet/quickshell](https://copr.fedorainfracloud.org/coprs/errornointernet/quickshell/) COPR has the current release, 0.3.2, and replaces Fedora's package when enabled:
 
@@ -289,7 +295,7 @@ sudo dnf copr enable errornointernet/quickshell
 sudo dnf install quickshell
 ```
 
-Quickshell has modules for the Hyprland and i3 IPC, but none for Mango. It doesn't need one: `mmsg watch tags DP-1` prints the tags of a monitor as one JSON object per line every time they change, and `mmsg watch focusing-client` does the same for the focused window. The bar runs both and parses the lines. Volume and microphone come from Quickshell's PipeWire service, the tray from its StatusNotifier service, and the song from kew's MPRIS interface, the standard D-Bus interface media players use to report what they're playing.
+Quickshell has modules for the Hyprland and i3 IPC, but none for Mango. It doesn't need one: `mmsg watch tags DP-1` prints the tags of a monitor as one JSON object per line every time they change, and `mmsg watch focusing-client` does the same for the focused window. The bar runs both and parses the lines. Volume, microphone and the list of outputs come from Quickshell's PipeWire service, the tray from its StatusNotifier service, and the song from kew's MPRIS interface, the standard D-Bus interface media players use to report what they're playing. The notifications come from its notification server and the password prompt from its polkit agent, both built into the COPR package.
 
 ```qml title="~/dotfiles/quickshell/.config/quickshell/shell.qml"
 //@ pragma UseQApplication
@@ -298,8 +304,11 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import Quickshell.Services.Mpris
+import Quickshell.Services.Notifications
 import Quickshell.Services.Pipewire
+import Quickshell.Services.Polkit
 import Quickshell.Services.SystemTray
 
 ShellRoot {
@@ -310,6 +319,7 @@ ShellRoot {
     readonly property color fg: "#e8e3e3"
     readonly property color muted: "#a39d9d"
     readonly property color red: "#b66467"
+    readonly property color border: "#424242"
 
     // Text in the bar font. Colors default to fg; callers override.
     component Label: Text {
@@ -370,21 +380,341 @@ ShellRoot {
     readonly property MprisPlayer music: Mpris.players.values
         .find(p => p.identity === "kew") ?? null
 
-    // Volume widget for a PipeWire node: click mutes, wheel changes by 5 %.
+    // Volume widget for a PipeWire node: click mutes, wheel changes by 5 %,
+    // right click emits rightClicked (the output list for "vol").
     component Volume: Label {
         id: vol
         required property string label
         property PwNode node
         readonly property PwNodeAudio audio: node?.audio ?? null
+        signal rightClicked
         visible: audio !== null
         text: audio ? `${label} ${Math.round(audio.volume * 100)}%` : ""
         color: audio?.muted ? "#a39d9d" : "#e8e3e3"
         MouseArea {
             anchors.fill: parent
-            onClicked: vol.audio.muted = !vol.audio.muted
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: mouse => {
+                if (mouse.button === Qt.RightButton)
+                    vol.rightClicked();
+                else
+                    vol.audio.muted = !vol.audio.muted;
+            }
             onWheel: wheel => {
                 const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
                 vol.audio.volume = Math.max(0, Math.min(1, vol.audio.volume + step));
+            }
+        }
+    }
+
+    // Audio outputs: hardware sinks only, programs' streams are left out.
+    // Choosing one sets PipeWire's preferred default; WirePlumber saves it
+    // and moves the streams that follow the default.
+    readonly property var sinks: Pipewire.nodes.values
+        .filter(n => n.isSink && !n.isStream && n.audio !== null)
+    function useSink(node: PwNode): void {
+        Pipewire.preferredDefaultAudioSink = node;
+    }
+    // `qs ipc call audio next` switches to the next output (Super+o).
+    IpcHandler {
+        target: "audio"
+        function next(): void {
+            if (root.sinks.length === 0)
+                return;
+            const i = root.sinks.indexOf(Pipewire.defaultAudioSink);
+            root.useSink(root.sinks[(i + 1) % root.sinks.length]);
+        }
+    }
+
+    // Volume OSD: 1.5 s after the output's volume, mute or the output itself
+    // changes. Changes during the first sync with PipeWire don't count.
+    property bool osdVisible: false
+    Timer {
+        id: osdTimer
+        interval: 1500
+        onTriggered: root.osdVisible = false
+    }
+    function showOsd(): void {
+        if (!Pipewire.ready || !Pipewire.defaultAudioSink?.ready)
+            return;
+        root.osdVisible = true;
+        osdTimer.restart();
+    }
+    Connections {
+        target: Pipewire.defaultAudioSink?.audio ?? null
+        function onVolumeChanged() { root.showOsd(); }
+        function onMutedChanged() { root.showOsd(); }
+    }
+    Connections {
+        target: Pipewire
+        function onDefaultAudioSinkChanged() { root.showOsd(); }
+    }
+
+    // LazyLoader creates the window each time it's shown. A layer surface
+    // without a screen goes to the monitor Mango has focused.
+    LazyLoader {
+        active: root.osdVisible
+
+        PanelWindow {
+            id: osd
+            readonly property PwNode sink: Pipewire.defaultAudioSink
+            readonly property real volume: sink?.audio?.volume ?? 0
+            readonly property bool muted: sink?.audio?.muted ?? false
+            anchors.bottom: true
+            margins.bottom: 120
+            exclusiveZone: 0
+            implicitWidth: 360
+            implicitHeight: 48
+            color: root.border
+            WlrLayershell.layer: WlrLayer.Overlay
+            // Clicks go through to the window underneath.
+            mask: Region {}
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 2
+                color: root.bg
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 12
+
+                    Label {
+                        text: osd.sink?.description || osd.sink?.name || ""
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                    Rectangle {
+                        Layout.preferredWidth: 120
+                        Layout.preferredHeight: 6
+                        color: root.border
+                        Rectangle {
+                            width: parent.width * Math.min(1, osd.volume)
+                            height: parent.height
+                            color: osd.muted ? root.muted : root.fg
+                        }
+                    }
+                    Label {
+                        text: osd.muted ? "mute" : `${Math.round(osd.volume * 100)}%`
+                        color: osd.muted ? root.muted : root.fg
+                        horizontalAlignment: Text.AlignRight
+                        Layout.preferredWidth: 40
+                    }
+                }
+            }
+        }
+    }
+
+    // Notifications (replaces mako). Each popup closes after the time the
+    // program asked for, 5 s by default; critical ones stay until clicked.
+    // Left click runs the default action, or dismisses; right click dismisses.
+    NotificationServer {
+        id: notifications
+        keepOnReload: false
+        actionsSupported: true
+        bodyMarkupSupported: true
+        imageSupported: true
+        onNotification: n => n.tracked = true
+    }
+    function notificationIcon(n: Notification): string {
+        if (n.image !== "")
+            return n.image;
+        if (n.appIcon.startsWith("/"))
+            return "file://" + n.appIcon;
+        if (n.appIcon.startsWith("file://"))
+            return n.appIcon;
+        return n.appIcon !== "" ? Quickshell.iconPath(n.appIcon, true) : "";
+    }
+
+    LazyLoader {
+        active: notifications.trackedNotifications.values.length > 0
+
+        PanelWindow {
+            // Top right, below the bar (exclusiveZone 0 keeps clear of it).
+            anchors {
+                top: true
+                right: true
+            }
+            margins {
+                top: 10
+                right: 10
+            }
+            exclusiveZone: 0
+            implicitWidth: 380
+            implicitHeight: list.implicitHeight
+            color: "transparent"
+
+            ColumnLayout {
+                id: list
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: notifications.trackedNotifications
+
+                    Rectangle {
+                        id: popup
+                        required property Notification modelData
+                        readonly property bool critical:
+                            modelData.urgency === NotificationUrgency.Critical
+                        readonly property string icon: root.notificationIcon(modelData)
+                        Layout.fillWidth: true
+                        implicitHeight: content.implicitHeight + 24
+                        color: root.bg
+                        border.width: 2
+                        border.color: critical ? root.red : root.border
+
+                        RowLayout {
+                            id: content
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 12
+
+                            Image {
+                                visible: popup.icon !== ""
+                                source: popup.icon
+                                sourceSize: Qt.size(48, 48)
+                                Layout.preferredWidth: 48
+                                Layout.preferredHeight: 48
+                                Layout.alignment: Qt.AlignTop
+                                fillMode: Image.PreserveAspectFit
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Label {
+                                    text: popup.modelData.summary
+                                    textFormat: Text.PlainText
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                                Label {
+                                    visible: text !== ""
+                                    text: popup.modelData.body
+                                    textFormat: Text.StyledText
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 6
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                            }
+                        }
+
+                        // expireTimeout arrives in milliseconds as the client
+                        // sent it: -1 means "server default", 0 means never.
+                        Timer {
+                            readonly property real timeout: popup.modelData.expireTimeout
+                            interval: timeout > 0 ? timeout : 5000
+                            running: timeout !== 0 && !(timeout < 0 && popup.critical)
+                            onTriggered: popup.modelData.expire()
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: mouse => {
+                                const n = popup.modelData;
+                                const action = n.actions.find(a => a.identifier === "default");
+                                if (mouse.button === Qt.LeftButton && action)
+                                    action.invoke();
+                                else
+                                    n.dismiss();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Password prompt for programs that ask polkit for privileges
+    // (replaces lxqt-policykit). Enter submits, Escape cancels.
+    PolkitAgent {
+        id: polkit
+    }
+
+    LazyLoader {
+        active: polkit.isActive
+
+        PanelWindow {
+            id: prompt
+            readonly property AuthFlow flow: polkit.flow
+            // No anchors: centred on the focused monitor, above everything,
+            // with the keyboard until it closes.
+            exclusionMode: ExclusionMode.Ignore
+            implicitWidth: 480
+            implicitHeight: form.implicitHeight + 40
+            color: root.border
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 2
+                color: root.bg
+
+                ColumnLayout {
+                    id: form
+                    anchors.fill: parent
+                    anchors.margins: 18
+                    spacing: 12
+
+                    Label {
+                        text: "Authentication required"
+                        font.bold: true
+                    }
+                    Label {
+                        text: prompt.flow?.message ?? ""
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                    // polkit itself rarely explains a failed attempt.
+                    Label {
+                        readonly property AuthFlow flow: prompt.flow
+                        visible: text !== ""
+                        text: flow?.supplementaryMessage
+                              || (flow?.failed ? "Wrong password, try again." : "")
+                        color: flow?.supplementaryIsError || flow?.failed ? root.red : root.muted
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                    Label {
+                        text: prompt.flow?.inputPrompt || "Password:"
+                        color: root.muted
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 32
+                        color: root.bg
+                        border.width: 2
+                        border.color: prompt.flow?.failed ? root.red : root.border
+
+                        TextInput {
+                            id: password
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            verticalAlignment: TextInput.AlignVCenter
+                            font.family: "Maple Mono"
+                            font.pointSize: 11
+                            color: root.fg
+                            echoMode: prompt.flow?.responseVisible
+                                      ? TextInput.Normal : TextInput.Password
+                            enabled: prompt.flow?.isResponseRequired ?? false
+                            focus: true
+                            onAccepted: {
+                                prompt.flow.submit(text);
+                                text = "";
+                            }
+                            Keys.onEscapePressed: prompt.flow.cancelAuthenticationRequest()
+                        }
+                    }
+                    Label {
+                        text: "Enter to confirm, Escape to cancel"
+                        color: root.muted
+                    }
+                }
             }
         }
     }
@@ -481,9 +811,63 @@ ShellRoot {
                     }
                 }
 
+                // Right click lists the outputs; clicking one switches to it.
+                // A click anywhere else closes the list.
                 Volume {
+                    id: volume
                     label: "vol"
                     node: Pipewire.defaultAudioSink
+                    onRightClicked: outputs.visible = !outputs.visible
+
+                    PopupWindow {
+                        id: outputs
+                        // Just below the bar, left edge under the label.
+                        anchor.item: volume
+                        anchor.rect.y: bar.height - right.y - volume.y
+                        grabFocus: true
+                        implicitWidth: 340
+                        implicitHeight: choices.implicitHeight + 4
+                        color: root.border
+
+                        Column {
+                            id: choices
+                            x: 2
+                            y: 2
+                            width: outputs.width - 4
+
+                            Repeater {
+                                model: root.sinks
+
+                                Rectangle {
+                                    id: choice
+                                    required property PwNode modelData
+                                    readonly property bool current:
+                                        modelData === Pipewire.defaultAudioSink
+                                    width: choices.width
+                                    clip: true
+                                    height: 28
+                                    color: hover.containsMouse ? root.border : root.bg
+
+                                    Label {
+                                        id: name
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: 12
+                                        text: `${choice.current ? "●" : "○"} ${choice.modelData.description || choice.modelData.name}`
+                                        color: choice.current ? root.fg : root.muted
+                                    }
+                                    MouseArea {
+                                        id: hover
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: {
+                                            root.useSink(choice.modelData);
+                                            outputs.visible = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Volume {
@@ -537,10 +921,16 @@ A few details in it:
 - `Variants` creates one bar per monitor, and each bar watches the tags of its own output.
 - `PwObjectTracker` keeps the default output and input bound. Without it, PipeWire doesn't send their volume.
 - The tray only opens menus because of the `UseQApplication` pragma on the first line.
-- `IpcHandler` gives the bar a command, `qs ipc call bar toggle`, which Super+b runs.
+- `IpcHandler` gives the shell two commands: `qs ipc call bar toggle`, which Super+b runs, and `qs ipc call audio next`, which Super+o runs.
 - Clicking a tag switches to it on that bar's monitor, clicking the music pauses or resumes it, and scrolling over the volume or microphone changes it, with a click to mute.
 - The title is the focused window's, so both monitors show the same one.
 - Tray menus use Qt's default light style rather than the Paradise colors.
+- The OSD, the notifications and the polkit prompt are layer surfaces without a screen, and `LazyLoader` creates them each time they appear, so Mango puts them on the monitor that has focus.
+- The OSD listens to PipeWire, so it shows whenever the volume changes: from the keys, the bar, Super+scroll or another program. It ignores the changes PipeWire reports while it first syncs at startup. `mask: Region {}` lets clicks through to the window underneath.
+- Right-clicking `vol` lists the outputs, with `●` on the current one. Clicking one switches to it; clicking anywhere else closes the list. Super+o goes to the next output without opening it. Both set PipeWire's preferred output, which WirePlumber remembers across reboots, and the programs that are playing move to it.
+- The list only has separate devices, such as a USB headset, the monitors' DisplayPort audio or Bluetooth. Headphones in the front jack of the same sound card as the speakers don't show up as a second output: PipeWire sees one output with two ports, and WirePlumber switches between them when you plug in.
+- Notifications stack at the top right, below the bar. Each one closes after the time the program asked for, or 5 s; critical ones get a red border and stay. Left click runs the notification's default action, or closes it if it has none, and right click closes it. Quickshell's documentation describes `expireTimeout` in seconds, but it arrives in milliseconds, as `notify-send -t` sends it.
+- The polkit prompt opens in the middle of the screen, above fullscreen windows, and takes the keyboard until it closes. Enter submits the password and Escape cancels. After a wrong password the field turns red and the prompt asks again. Try it with `pkexec true`.
 
 The file is also [here](/files/mango-0.18/shell.qml) to download.
 
@@ -634,12 +1024,19 @@ kew publishes what it's playing over MPRIS under the name `kew`, which is how th
 ## The rest of the desktop
 
 ```bash
-sudo dnf install foot wmenu swaybg mako libnotify swaylock swayidle wlopm firefox \
+sudo dnf install foot wmenu swaybg libnotify swaylock swayidle wlopm firefox \
   wl-clipboard cliphist grim slurp grimpicker \
-  xdg-desktop-portal-wlr xdg-desktop-portal-gtk lxqt-policykit xdg-user-dirs \
+  xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-user-dirs \
   nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui \
   google-noto-color-emoji-fonts
 xdg-user-dirs-update
+```
+
+[wl-clip-persist](https://github.com/Linus789/wl-clip-persist) isn't in Fedora or Terra. The [sassech/packages](https://copr.fedorainfracloud.org/coprs/sassech/packages/) COPR builds 0.5.0, the latest release, for Fedora 45:
+
+```bash
+sudo dnf copr enable sassech/packages
+sudo dnf install wl-clip-persist
 ```
 
 | Package | Role |
@@ -648,17 +1045,19 @@ xdg-user-dirs-update
 | `firefox` | browser |
 | `wmenu` | launcher; `wmenu-run` lists everything in `$PATH` |
 | `swaybg` | background |
-| `mako`, `libnotify` | notifications, and `notify-send` to test them |
+| `libnotify` | `notify-send`, to test the notifications |
 | `swaylock`, `swayidle`, `wlopm` | lock screen after ten minutes idle, monitors off after fifteen |
 | `wl-clipboard`, `cliphist` | `wl-copy`/`wl-paste` (Neovim uses them for the system clipboard) and the clipboard history behind Super+v |
+| `wl-clip-persist` | keeps the clipboard when the program you copied from closes; without it, `wl-paste` finds nothing |
 | `grim`, `slurp` | screenshots, whole screen or a selected region |
 | `grimpicker` | color picker; Fedora builds it from sway-contrib as its own package, without sway |
 | `xdg-desktop-portal-wlr`, `-gtk` | screen sharing in browsers, Discord and OBS, plus file pickers |
-| `lxqt-policykit` | password prompts for programs that ask polkit for privileges |
 | `nnn`, `zathura`, `imv`, `mpv` | files, PDFs, images, video |
 | `NetworkManager-tui` | `nmtui`, a menu for Wi-Fi and network connections |
 
 PipeWire and WirePlumber came with `@multimedia` in part 1. `xdg-user-dirs-update` creates `~/Pictures` and the other standard folders; the Print binding saves there.
+
+Quickshell shows the notifications and the polkit prompt, so mako and lxqt-policykit aren't in the list. If mako is already installed, remove it with `sudo dnf remove mako`. Its D-Bus service file starts it whenever a notification arrives while nothing owns the notification name, for example before `qs` is up at login, and after that mako keeps the notifications.
 
 ### Locking, screens off, and games
 
@@ -721,7 +1120,7 @@ fc-cache -f
 fc-match "Maple Mono"
 ```
 
-The last command should print `MapleMono-Regular.ttf: "Maple Mono" "Regular"`. The bar, foot, wmenu, mako and swaylock all find it by that name. In foot the cursive italic shows up, but the ligatures don't: `->` and `!=` stay as separate characters.
+The last command should print `MapleMono-Regular.ttf: "Maple Mono" "Regular"`. Quickshell, foot, wmenu and swaylock all find it by that name. In foot the cursive italic shows up, but the ligatures don't: `->` and `!=` stay as separate characters.
 
 Maple Mono has no icon glyphs, and eza, Neovim's file tree and statusline use them. The symbols-only Nerd Font from Terra fills that gap: foot finds it through fontconfig and uses it for any character Maple Mono lacks, so there's no need for a patched copy of the font:
 
@@ -838,7 +1237,7 @@ Ctrl+V replaces fish's own paste binding; in foot, Ctrl+Shift+V pastes.
 
 ## Paradise everywhere
 
-Mango's borders, the bar and the launcher get their colors from the files above. The other programs read their own config files.
+Mango's borders, everything Quickshell draws and the launcher get their colors from the files above. The other programs read their own config files.
 
 foot 1.28 calls the color section `colors-dark`:
 
@@ -872,19 +1271,6 @@ bright7=e8e3e3
 ```
 
 `foot --check-config` validates the file.
-
-```ini title="~/dotfiles/mako/.config/mako/config"
-font=Maple Mono 11
-background-color=#151515
-text-color=#e8e3e3
-border-color=#424242
-border-size=2
-default-timeout=5000
-
-[urgency=critical]
-border-color=#b66467
-default-timeout=0
-```
 
 ```ini title="~/dotfiles/swaylock/.config/swaylock/config"
 color=151515
