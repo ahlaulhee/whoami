@@ -3,8 +3,8 @@ slug: mango-0.18-setup
 title: Building a Mango desktop on Fedora 45
 description: Mango 0.18 with the scrolling layout on every tag, a Quickshell status bar, kew for music, greetd, fish with the pure prompt, both monitors at full refresh, and Steam on NVIDIA.
 pubDate: 2026-11-08
-updatedDate: 2026-11-09
-tags: [mango, wayland, quickshell, fish, fedora, nvidia, gaming]
+updatedDate: 2026-11-10
+tags: [mango, wayland, quickshell, fish, firefox, fedora, nvidia, gaming]
 testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, fish 4.6, akmod-nvidia 615.78, RTX 5070]
 series:
   name: Fedora 45 + Mango from scratch
@@ -34,6 +34,7 @@ All the configuration lives in one git repository, `~/dotfiles`. Each program ge
 ```txt
 ~/dotfiles
 ├── bin/mango-idle                     # copied to /usr/local/bin
+├── firefox/chrome/{userChrome,userContent}.css   # linked by hand, see Firefox
 ├── fish/.config/fish/{config.fish,fish_plugins}
 ├── fonts/.local/share/fonts/maple-mono/
 ├── foot/.config/foot/foot.ini
@@ -56,7 +57,7 @@ Once the files exist, link them by naming the folders:
 stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mango quickshell swaylock xdpw zathura
 ```
 
-Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` stays out of the list; its script is copied to `/usr/local/bin`.
+Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` and `firefox` stay out of the list: the script is copied to `/usr/local/bin`, and the Firefox folder goes into a profile whose name Stow can't know.
 
 ## Configure Mango
 
@@ -1288,6 +1289,36 @@ font=Maple Mono
 ```
 
 For zathura I use the [Paradise zathurarc](https://github.com/paradise-theme/paradise/blob/main/cfg/zathura/zathurarc) as it is, with the font line changed to `set font "Maple Mono 11"`.
+
+## Firefox
+
+Firefox reads two stylesheets from the profile: `userChrome.css` for the interface and `userContent.css` for its own pages, like Settings and New Tab. Mine make every corner square, use the desktop's palette and Maple Mono, and expect the tabs in the sidebar. They're written for Firefox 159: [userChrome.css](/files/mango-0.18/firefox/userChrome.css) and [userContent.css](/files/mango-0.18/firefox/userContent.css).
+
+They need four preferences in `about:config`:
+
+```txt title="about:config"
+toolkit.legacyUserProfileCustomizations.stylesheets  true
+browser.nova.enabled                                 false
+browser.compactmode.show                             true
+sidebar.verticalTabs                                 true
+```
+
+The first makes Firefox load the stylesheets, and the second turns off its newer, rounder look. The third brings back the Compact density; pick it under Density in Customize Toolbar. Use the built-in Dark theme underneath.
+
+Firefox loads the files from a `chrome` folder inside the profile, and the profile folder has a random name that `about:support` shows on the Profile Folder row. Stow can't aim at a name it doesn't know, so the folder stays in the repository and the profile gets a symlink to it:
+
+```bash
+ln -s ~/dotfiles/firefox/chrome ~/.config/mozilla/firefox/xxxxxxxx.default-release/chrome
+```
+
+Older profiles live in `~/.mozilla/firefox/` instead. Firefox reads the files only at startup, so restart it after every change. What they change:
+
+- Every radius variable Firefox defines goes to 0. Many components define them again on their own element, so the file sets them on `*` rather than `:root`.
+- Toolbars, sidebar and menus are `#151515`, hover is `#1c1c1c`, borders are `#424242`, and focus and links are blue.
+- The selected tab has a blue edge on the left, like Mango's focused window. A background tab whose title changed, as WhatsApp or Gmail do when a message arrives, gets a green edge in the same place instead of Firefox's dot over the icon.
+- Settings, New Tab and the other `about:` pages get the same corners and colors. Websites keep their own.
+
+All of this relies on Firefox's internal variables, and an update can rename one. The crossword widget on New Tab is the most fragile part: it's a Mozilla web page inside a frame, styled through the variable names of its own stylesheet. When something turns round or purple again, the Browser Toolbox (Ctrl+Alt+Shift+I) shows which variable it uses now; it opens once `devtools.chrome.enabled` and `devtools.debugger.remote-enabled` are `true`.
 
 ## NVIDIA
 

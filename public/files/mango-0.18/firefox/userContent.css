@@ -1,0 +1,143 @@
+/* Paradise, square: Firefox's own pages (Settings, New Tab, Add-ons, ...).
+ * Websites are left alone. */
+
+@-moz-document url-prefix("about:"), url-prefix("chrome://") {
+  * {
+    --border-radius: 0 !important;
+    --border-radius-xsmall: 0 !important;
+    --border-radius-small: 0 !important;
+    --border-radius-medium: 0 !important;
+    --border-radius-large: 0 !important;
+    --border-radius-xlarge: 0 !important;
+    --button-border-radius: 0 !important;
+    --card-border-radius: 0 !important;
+    --card-border-radius-compact: 0 !important;
+    --input-border-radius: 0 !important;
+    --input-search-border-radius: 0 !important;
+    --panel-border-radius: 0 !important;
+    --panel-list-border-radius: 0 !important;
+    --panel-menuitem-border-radius: 0 !important;
+    --popup-border-radius: 0 !important;
+    --promo-border-radius: 0 !important;
+    --tiles-container-border-radius: 0 !important;
+    --visual-picker-item-border-radius: 0 !important;
+    --message-bar-border-radius: 0 !important;
+    --page-nav-button-border-radius: 0 !important;
+    --select-border-radius: 0 !important;
+    --toggle-border-radius: 0 !important;
+  }
+
+  :root {
+    --background-color-canvas: #151515 !important;
+    --background-color-box: #1c1c1c !important;
+    --background-color-list-item-hover: #1c1c1c !important;
+    --text-color: #e8e3e3 !important;
+    --text-color-deemphasized: #a39d9d !important;
+    --border-color: #2a2a2a !important;
+    --border-color-deemphasized: #2a2a2a !important;
+    --border-color-interactive: #424242 !important;
+    --card-background-color: #151515 !important;
+    --card-border-color: #2a2a2a !important;
+    --card-box-shadow: none !important;
+    --card-box-shadow-hover: none !important;
+    --color-accent-primary: #8da3b9 !important;
+    --color-accent-primary-hover: #8da3b9 !important;
+    --color-accent-primary-active: #8da3b9 !important;
+    --color-accent-primary-selected: #8da3b9 !important;
+    --text-color-accent-primary-selected: #151515 !important;
+    --button-background-color: #1c1c1c !important;
+    --button-background-color-hover: #2a2a2a !important;
+    --button-background-color-active: #424242 !important;
+    --button-text-color: #e8e3e3 !important;
+    --button-background-color-primary: #8da3b9 !important;
+    --button-background-color-primary-hover: #a5b6c7 !important;
+    --button-background-color-primary-active: #8da3b9 !important;
+    --button-text-color-primary: #151515 !important;
+    --button-text-color-primary-hover: #151515 !important;
+    --focus-outline-color: #8da3b9 !important;
+    --link-color: #8da3b9 !important;
+    --link-color-hover: #a5b6c7 !important;
+    --icon-color: #e8e3e3 !important;
+    --input-background-color: #1c1c1c !important;
+    --input-border-color: #2a2a2a !important;
+    --box-shadow-level-1: none !important;
+    --box-shadow-level-2: none !important;
+    --box-shadow-level-3: none !important;
+    --box-shadow-level-4: none !important;
+    --promo-background-color-vibrant: #1c1c1c !important;
+    --promo-message-text-color-vibrant: #e8e3e3 !important;
+    --newtab-background-color: #151515 !important;
+    --newtab-background-color-secondary: #1c1c1c !important;
+    --newtab-text-primary-color: #e8e3e3 !important;
+    font-family: "Maple Mono", monospace !important;
+  }
+
+  /* Settings side navigation: same look as the vertical tabs. The buttons
+   * redefine these on their own host, so set them everywhere. */
+  * {
+    --page-nav-button-background-color: transparent !important;
+    --page-nav-button-background-color-hover: #1c1c1c !important;
+    --page-nav-button-background-color-active: #2a2a2a !important;
+    --page-nav-button-background-color-selected: #2a2a2a !important;
+    --page-nav-button-text-color: #a39d9d !important;
+    --page-nav-button-text-color-hover: #e8e3e3 !important;
+    --page-nav-button-text-color-selected: #e8e3e3 !important;
+    --page-nav-button-indicator-background-color: #8da3b9 !important;
+    --page-nav-button-border-color: transparent !important;
+    --page-nav-button-border-radius: 0 !important;
+  }
+
+  body {
+    background-image: none !important;
+  }
+}
+
+/* New Tab: the letter tiles, pill buttons and "NEW" badges are circles or
+ * pills through --border-radius-circle, and the badges are bright green. */
+@-moz-document url("about:newtab"), url("about:home"), url("about:privatebrowsing") {
+  * {
+    --border-radius-circle: 0 !important;
+    --badge-border-radius: 0 !important;
+    --badge-background-color-filled: #8c977d !important;
+    --badge-text-color-filled: #151515 !important;
+  }
+  /* The focus timer draws its progress ring with the same token. */
+  .focus-timer,
+  .focus-timer * {
+    --border-radius-circle: 9999px !important;
+  }
+  :root {
+    --newtab-primary-action-background: #8da3b9 !important;
+    --newtab-primary-element-text-color: #151515 !important;
+    --newtab-background-card: #151515 !important;
+    --newtab-button-background: #1c1c1c !important;
+    --newtab-button-hover-background: #2a2a2a !important;
+    --newtab-button-static-background: #1c1c1c !important;
+    --newtab-button-static-hover-background: #2a2a2a !important;
+    --newtab-text-secondary-color: #a39d9d !important;
+    --newtab-weather-background-color: #151515 !important;
+  }
+}
+
+/* The crossword widget on New Tab is a page from Mozilla's games server in
+ * an iframe, with its own violet palette and pill buttons. Its variable
+ * names come from that page's stylesheet, so a change on their side can
+ * undo this. */
+@-moz-document domain("prod-games-particle.merino.prod.webservices.mozgcp.net") {
+  :root {
+    --palette-violet: #8da3b9 !important;
+    --palette-violet-action: #8da3b9 !important;
+    --palette-violet-light: #a5b6c7 !important;
+    --widget-accent: #8da3b9 !important;
+    --widget-accent-text: #151515 !important;
+    --widget-violet-fill: #8da3b9 !important;
+    --widget-violet-stroke: #8da3b9 !important;
+    --start-card-accent: #8da3b9 !important;
+    --start-card-button-text: #151515 !important;
+    --start-card-link-text: #8da3b9 !important;
+    --widget-control-radius: 0 !important;
+    --widget-control-radius-md: 0 !important;
+    --widget-control-radius-lg: 0 !important;
+    --widget-popover-radius: 0 !important;
+  }
+}

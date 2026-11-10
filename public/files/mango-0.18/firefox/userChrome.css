@@ -1,0 +1,245 @@
+/* Paradise, square: userChrome.css for Firefox 159 with vertical tabs in the
+ * sidebar, the built-in Dark theme and compact density. Tested with
+ * browser.nova.enabled both false and true. */
+
+:root {
+  --pd-ground: #101010;
+  --pd-panel: #151515;
+  --pd-raised: #1c1c1c;
+  --pd-line: #2a2a2a;
+  --pd-line-strong: #424242;
+  --pd-fg: #e8e3e3;
+  --pd-muted: #a39d9d;
+  --pd-blue: #8da3b9;
+  --pd-red: #b66467;
+  --pd-green: #8c977d;
+  --pd-yellow: #d9bc8c;
+  --pd-font: "Maple Mono", monospace;
+}
+
+/* ---------------------------------------------------------------------------
+ * Square corners: every radius token Firefox defines, set to 0 wherever it
+ * is redefined. --border-radius-circle stays (radio dots, avatars).
+ * ------------------------------------------------------------------------ */
+* {
+  --border-radius: 0 !important;
+  --border-radius-xsmall: 0 !important;
+  --border-radius-small: 0 !important;
+  --border-radius-medium: 0 !important;
+  --border-radius-large: 0 !important;
+  --border-radius-xlarge: 0 !important;
+  --arrowscrollbox-scrollicon-border-radius: 0 !important;
+  --box-icon-border-radius: 0 !important;
+  --button-border-radius: 0 !important;
+  --card-border-radius: 0 !important;
+  --card-border-radius-compact: 0 !important;
+  --chip-border-radius: 0 !important;
+  --content-area-start-radius: 0 !important;
+  --input-border-radius: 0 !important;
+  --input-search-border-radius: 0 !important;
+  --menuitem-border-radius: 0 !important;
+  --panel-border-radius: 0 !important;
+  --panel-item-button-border-radius: 0 !important;
+  --panel-list-border-radius: 0 !important;
+  --panel-menuitem-border-radius: 0 !important;
+  --popup-border-radius: 0 !important;
+  --row-item-border-radius: 0 !important;
+  --sidebar-box-start-end-radius: 0 !important;
+  --sidebar-box-start-start-radius: 0 !important;
+  --tab-border-radius: 0 !important;
+  --tab-group-label-highlight-radius: 0 !important;
+  --toolbarbutton-border-radius: 0 !important;
+  --urlbar-background-border-radius: 0 !important;
+  --urlbar-background-border-top-radius-open: 0 !important;
+  --urlbar-border-radius: 0 !important;
+  --urlbar-inner-border-radius: 0 !important;
+  --urlbarview-border-radius: 0 !important;
+  --urlbarview-icon-border-radius: 0 !important;
+  --urlbarview-row-border-radius: 0 !important;
+  --window-border-radius: 0 !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Colours
+ * ------------------------------------------------------------------------ */
+:root {
+  /* design-system tokens: popups, menus, settings-style widgets */
+  --background-color-canvas: var(--pd-panel) !important;
+  --background-color-box: var(--pd-raised) !important;
+  --background-color-list-item-hover: var(--pd-raised) !important;
+  --text-color: var(--pd-fg) !important;
+  --text-color-deemphasized: var(--pd-muted) !important;
+  --border-color: var(--pd-line) !important;
+  --border-color-deemphasized: var(--pd-line) !important;
+  --border-color-interactive: var(--pd-line-strong) !important;
+  --color-accent-primary: var(--pd-blue) !important;
+  --color-accent-primary-hover: var(--pd-blue) !important;
+  --color-accent-primary-active: var(--pd-blue) !important;
+  --focus-outline-color: var(--pd-blue) !important;
+  --link-color: var(--pd-blue) !important;
+  --icon-color: var(--pd-fg) !important;
+
+  --panel-background-color: var(--pd-panel) !important;
+  --panel-text-color: var(--pd-fg) !important;
+  --panel-border-color: var(--pd-line-strong) !important;
+  --panel-separator-color: var(--pd-line) !important;
+  --panel-box-shadow: none !important;
+  --arrowpanel-background: var(--pd-panel) !important;
+  --arrowpanel-color: var(--pd-fg) !important;
+  --arrowpanel-border-color: var(--pd-line-strong) !important;
+
+  /* window, toolbars, address bar */
+  --toolbox-background-color: var(--pd-panel) !important;
+  --toolbox-background-color-inactive: var(--pd-panel) !important;
+  --toolbox-text-color: var(--pd-fg) !important;
+  --toolbox-text-color-inactive: var(--pd-muted) !important;
+  --toolbar-background-color: var(--pd-panel) !important;
+  --toolbar-text-color: var(--pd-fg) !important;
+  --toolbarbutton-background-color-hover: var(--pd-raised) !important;
+  --toolbarbutton-background-color-active: var(--pd-line-strong) !important;
+  --toolbarbutton-icon-fill: var(--pd-fg) !important;
+  --toolbar-field-background-color: var(--pd-raised) !important;
+  --toolbar-field-background-color-focus: var(--pd-raised) !important;
+  --toolbar-field-text-color: var(--pd-fg) !important;
+  --toolbar-field-text-color-focus: var(--pd-fg) !important;
+  --toolbar-field-border-color: var(--pd-line) !important;
+  --toolbar-field-border-color-focus: var(--pd-blue) !important;
+  --urlbar-box-background-color: var(--pd-raised) !important;
+  --urlbar-box-background-color-hover: var(--pd-line) !important;
+  --urlbarview-background-color-hover: var(--pd-raised) !important;
+  --urlbarview-background-color-selected: var(--pd-line-strong) !important;
+  --urlbarview-text-color-selected: var(--pd-fg) !important;
+  --urlbarview-text-color-secondary: var(--pd-muted) !important;
+  --urlbarview-separator-color: var(--pd-line) !important;
+
+  /* tabs, sidebar, content edge */
+  --tab-background-color-hover: var(--pd-raised) !important;
+  --tab-background-color-selected: var(--pd-line) !important;
+  --tab-text-color-selected: var(--pd-fg) !important;
+  --sidebar-background-color: var(--pd-panel) !important;
+  --sidebar-text-color: var(--pd-fg) !important;
+  --sidebar-border-color: var(--pd-line) !important;
+  --tabpanel-background-color: var(--pd-panel) !important;
+  --chrome-content-separator-color: var(--pd-line) !important;
+  --content-area-shadow: none !important;
+  --card-box-shadow: none !important;
+  --tabs-navbar-separator-color: var(--pd-line) !important;
+
+  font-family: var(--pd-font) !important;
+}
+
+/* The built-in Dark theme sets these inline; the user sheet's !important wins. */
+:root[lwtheme] {
+  --lwt-accent-color: var(--pd-panel) !important;
+  --lwt-text-color: var(--pd-fg) !important;
+}
+
+/* Maple Mono for the whole interface, not just the root. */
+#navigator-toolbox,
+sidebar-main,
+#sidebar-box,
+menupopup,
+panel,
+#urlbar,
+.tabbrowser-tab {
+  font-family: var(--pd-font) !important;
+}
+
+/* With Nova on, the window body has a purple gradient that shows through
+ * everything without its own background (toolbars, the sidebar launcher). */
+body {
+  background-image: none !important;
+  background-color: var(--pd-panel) !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Vertical tabs in the sidebar
+ * ------------------------------------------------------------------------ */
+sidebar-main,
+#vertical-tabs {
+  background-color: var(--pd-panel) !important;
+}
+
+/* The "drag important tabs here" card at the top of the sidebar, violet by
+ * default, shown until you pin a tab or close it. */
+sidebar-pins-promo {
+  --promo-dark-background: var(--pd-raised) !important;
+  --promo-dark-text: var(--pd-muted) !important;
+  --promo-dark-icon-border: var(--pd-line-strong) !important;
+  --promo-light-background: var(--pd-raised) !important;
+  --promo-light-text: var(--pd-muted) !important;
+  --promo-light-icon-border: var(--pd-line-strong) !important;
+}
+
+/* Selected tab: raised fill plus a blue edge on the content side, like
+ * Mango's focused border. */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab .tab-background {
+  border-color: transparent !important;
+  background-clip: border-box !important;
+  outline: none !important;
+}
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[selected] .tab-background {
+  background-color: var(--pd-line) !important;
+}
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:not([selected]):hover .tab-background {
+  background-color: var(--pd-raised) !important;
+}
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:not([selected]) .tab-label {
+  color: var(--pd-muted) !important;
+}
+
+/* No gradients, glows or shadows anywhere in the chrome. */
+.tab-background,
+#urlbar-background,
+toolbarbutton,
+.toolbarbutton-1 > .toolbarbutton-icon,
+.toolbarbutton-1 > .toolbarbutton-badge-stack,
+panel,
+menupopup {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[selected] .tab-background {
+  box-shadow: inset 2px 0 0 var(--pd-blue) !important;
+}
+
+/* A background tab whose title changed (unread messages, a finished build)
+ * gets a green edge where the selected tab has its blue one, instead of
+ * Firefox's dot over the favicon. Pinned and collapsed tabs too. */
+.tabbrowser-tab > .tab-stack > .tab-content:is([titlechanged], [attention]):not([selected]) {
+  background-image: none !important;
+}
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:is([titlechanged], [attention]):not([selected]) .tab-background {
+  box-shadow: inset 2px 0 0 var(--pd-green) !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * Menus and panels redefine their colours on the popup itself (GTK's Menu
+ * colour on Linux), so the :root values above don't reach them.
+ * ------------------------------------------------------------------------ */
+menupopup,
+panel {
+  --panel-background-color: var(--pd-panel) !important;
+  --panel-text-color: var(--pd-fg) !important;
+  --panel-border-color: var(--pd-line-strong) !important;
+  --panel-separator-color: var(--pd-line) !important;
+  --background-color-canvas: var(--pd-panel) !important;
+  --text-color: var(--pd-fg) !important;
+}
+menu:where([_moz-menuactive]:not([disabled])),
+menuitem:where([_moz-menuactive]:not([disabled])) {
+  background-color: var(--pd-line) !important;
+  color: var(--pd-fg) !important;
+}
+
+/* App menu: the sign-in promo and the purple-to-orange separator under it. */
+panel {
+  --panel-separator-zap-gradient: none !important;
+  --promo-background-color-vibrant: var(--pd-raised) !important;
+  --promo-message-text-color-vibrant: var(--pd-fg) !important;
+  --promo-border-radius: 0 !important;
+}
+toolbarseparator.proton-zap::before {
+  border-image: none !important;
+  border-color: var(--pd-line) !important;
+}
