@@ -3,7 +3,7 @@ slug: neovim-setup
 title: My Neovim config
 description: Neovim 0.12 on Fedora 45 with native LSP for .NET, TypeScript/React, Go, Lua and Python, blink.cmp, conform, nvim-lint, mini.nvim, neo-tree and vague.nvim, used inside tmux next to a coding agent.
 pubDate: 2026-11-08
-tags: [neovim, tmux, lsp, dotnet, typescript, go, python, lua, opencode]
+tags: [neovim, tmux, opencode]
 testedOn: [Fedora 45, Neovim 0.12.6, tmux 3.8, opencode 2.2.6, .NET SDK 10, Node.js 22, Go 1.27, Python 3.15]
 series:
   name: Fedora 45 + Mango from scratch

@@ -4,7 +4,7 @@ title: Building a Mango desktop on Fedora 45
 description: Mango 0.18 with the scrolling layout on every tag, a Quickshell status bar, kew for music, greetd, fish with the pure prompt, both monitors at full refresh, and Steam on NVIDIA.
 pubDate: 2026-11-08
 updatedDate: 2026-11-10
-tags: [mango, wayland, quickshell, fish, firefox, fedora, nvidia, gaming]
+tags: [mango, wayland, quickshell]
 testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, fish 4.6, akmod-nvidia 615.78, RTX 5070]
 series:
   name: Fedora 45 + Mango from scratch
