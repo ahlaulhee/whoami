@@ -1292,7 +1292,7 @@ For zathura I use the [Paradise zathurarc](https://github.com/paradise-theme/par
 
 ## Firefox
 
-Firefox reads two stylesheets from the profile: `userChrome.css` for the interface and `userContent.css` for its own pages, like Settings and New Tab. Mine make every corner square, use the desktop's palette and Maple Mono, and expect the tabs in the sidebar. They're written for Firefox 159: [userChrome.css](/files/mango-0.18/firefox/userChrome.css) and [userContent.css](/files/mango-0.18/firefox/userContent.css).
+Firefox reads two stylesheets from the profile: `userChrome.css` for the interface and `userContent.css` for its own pages, like Settings and New Tab. Mine square every corner and use the desktop's palette and font. They assume the tabs are in the sidebar and were written for Firefox 159: [userChrome.css](/files/mango-0.18/firefox/userChrome.css) and [userContent.css](/files/mango-0.18/firefox/userContent.css).
 
 They need four preferences in `about:config`:
 
@@ -1311,12 +1311,14 @@ Firefox loads the files from a `chrome` folder inside the profile, and the profi
 ln -s ~/dotfiles/firefox/chrome ~/.config/mozilla/firefox/xxxxxxxx.default-release/chrome
 ```
 
-Older profiles live in `~/.mozilla/firefox/` instead. Firefox reads the files only at startup, so restart it after every change. What they change:
+Older profiles live in `~/.mozilla/firefox/` instead. Firefox reads the files only at startup, so restart it after every change.
+
+With the files in place:
 
 - Every radius variable Firefox defines goes to 0. Many components define them again on their own element, so the file sets them on `*` rather than `:root`.
 - Toolbars, sidebar and menus are `#151515`, hover is `#1c1c1c`, borders are `#424242`, and focus and links are blue.
 - The selected tab has a blue edge on the left, like Mango's focused window. A background tab whose title changed, as WhatsApp or Gmail do when a message arrives, gets a green edge in the same place instead of Firefox's dot over the icon.
-- Settings, New Tab and the other `about:` pages get the same corners and colors. Websites keep their own.
+- Settings, New Tab and the other `about:` pages get the same corners and colors, while websites keep their own.
 
 All of this relies on Firefox's internal variables, and an update can rename one. The crossword widget on New Tab is the most fragile part: it's a Mozilla web page inside a frame, styled through the variable names of its own stylesheet. When something turns round or purple again, the Browser Toolbox (Ctrl+Alt+Shift+I) shows which variable it uses now; it opens once `devtools.chrome.enabled` and `devtools.debugger.remote-enabled` are `true`.
 
