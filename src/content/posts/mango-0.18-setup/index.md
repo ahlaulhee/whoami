@@ -33,13 +33,15 @@ All the configuration lives in one git repository, `~/dotfiles`. Each program ge
 
 ```txt
 ~/dotfiles
-├── bin/{mango-idle,mango-lock}        # copied to /usr/local/bin
+├── bin/{mango-idle,mango-lock,mango-tag}   # copied to /usr/local/bin
 ├── firefox/chrome/{userChrome,userContent}.css   # linked by hand, see Firefox
 ├── fish/.config/fish/{config.fish,fish_plugins}
 ├── fonts/.local/share/fonts/maple-mono/
 ├── foot/.config/foot/foot.ini
 ├── kew/.config/kew/themes/paradise.theme
 ├── mango/.config/mango/config.conf
+├── mime/.config/mimeapps.list
+├── mime/.local/share/applications/foot-{nnn,nvim}.desktop
 ├── quickshell/.config/quickshell/{shell,lock}.qml
 ├── xdpw/.config/xdg-desktop-portal-wlr/config
 └── zathura/.config/zathura/zathurarc
@@ -53,7 +55,7 @@ git init ~/dotfiles
 Once the files exist, link them by naming the folders:
 
 ```bash
-stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mango quickshell xdpw zathura
+stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mango mime quickshell xdpw zathura
 ```
 
 Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` and `firefox` stay out of the list: the scripts are copied to `/usr/local/bin`, and the Firefox folder goes into a profile whose name Stow can't know.
@@ -76,7 +78,7 @@ Replace `DP-1` and `DP-2` with the names `mmsg get all-monitors` or `wlr-randr` 
 ### Tags and the scroller
 
 ```ini title="~/dotfiles/mango/.config/mango/config.conf"
-tag_num=9
+tag_num=8
 tag_rule=id:*,layout_name:scroller
 circle_layout=scroller,tile,monocle
 monocle_tab_mode=0
@@ -93,6 +95,36 @@ scroller_focus_center=1
 ```
 
 `tag_rule=id:*` applies the scroller to every tag on both monitors. New windows open at 80% of the screen width, so the neighbouring window always shows at the edge, and the focused one stays centred while you move through the strip. Super+Shift+space still switches a tag to `tile` or `monocle` when a scrolling strip isn't what you want. Monocle normally draws a tab bar over its windows, in Mango's own colors and with rounded corners; `monocle_tab_mode=0` turns it off. With `view_current_to_back=1`, pressing Super and the number of the tag you're already on goes back to the tag you came from.
+
+### Tags on each monitor
+
+Each monitor in Mango has its own set of tags, and Super+N normally acts on the monitor that has focus. I want the number to decide the screen instead: tags 1 to 4 on the 27" and 5 to 8 on the 24". `tag_num=8` drops the ninth.
+
+Super+Shift+N uses `tagcrossmon`, which moves the window to that tag on the right monitor and follows it there. Super+N goes through a short script. `viewcrossmon`, the dispatcher that shows a tag on a given monitor, ignores `view_current_to_back`, so when the tag's monitor already has focus the script uses `view` instead, and pressing the number of the tag on screen still goes back to the previous one:
+
+```sh title="~/dotfiles/bin/mango-tag"
+#!/bin/sh
+# Show tag $1 on the monitor that owns it: 1-4 on the 27" (DP-2), 5-8 on the
+# 24" (DP-1). On the focused monitor use view, so the number of the tag on
+# screen goes back to the previous tag (view_current_to_back=1).
+case $1 in
+[1-4]) mon=DP-2 ;;
+[5-8]) mon=DP-1 ;;
+*) exit 1 ;;
+esac
+focused=$(mmsg get all-monitors | jq -r '.monitors[] | select(.active) | .name')
+if [ "$focused" = "$mon" ]; then
+	exec mmsg dispatch view,"$1"
+else
+	exec mmsg dispatch viewcrossmon,"$1","$mon"
+fi
+```
+
+```bash
+sudo install -m 755 ~/dotfiles/bin/mango-tag /usr/local/bin/
+```
+
+Mango starts every monitor on tag 1; a line in [Autostart](#autostart) moves the 24" to tag 5. Replace `DP-1` and `DP-2` there, in the script, in the keybinds and in the Discord rule under [Window rules](#window-rules) with the names from your monitor rules. The bar needs no changes: each one already lists the tags of its own monitor.
 
 ### Look
 
@@ -139,9 +171,13 @@ exec_once=wl-clip-persist --clipboard regular
 exec_once=wl-paste --watch cliphist store
 exec_once=/usr/local/bin/mango-idle
 exec_once=qs
+exec_once=discord
+exec_once=mmsg dispatch viewcrossmon,5,DP-1; mmsg dispatch focusmon,DP-2; firefox
 ```
 
 `exec_once` runs a command once at login, and `exec` runs it again on every reload. Mango exports its environment to systemd and D-Bus and starts a `mango-session.target` by itself, so nothing here does that; the screen-sharing portal finds the session without help. `qs` is Quickshell, which draws the status bar, the volume OSD, the notifications and the polkit password prompt. `wl-clip-persist` keeps what you copied after the program you copied it from closes. `mango-idle` is a short script covered in [Locking, screens off, and games](#locking-screens-off-and-games).
+
+The last line moves the 24" to tag 5, the first of its tags, gives focus back to the 27" and only then starts Firefox, which opens where the focus is: tag 1 of the 27". The `;` instead of `&&` starts Firefox even if `mmsg` fails. Discord gets its place from a window rule instead, so it doesn't matter which of the two opens first.
 
 ### Window rules
 
@@ -152,6 +188,7 @@ window_rule=is_floating:1,app_id:^steam$,title:^(Friends List|Steam Settings)$
 window_rule=confine_pointer:1,app_id:^steam_app_.*$
 window_rule=idle_inhibit_when_focus:1,app_id:^(steam_app_.*|gamescope)$
 window_rule=is_tag_silent:1,app_id:^(steam|discord)$
+window_rule=tags:5,monitor:DP-1,is_open_silent:1,app_id:^discord$
 
 # to try: tearing in fullscreen games
 #allow_tearing=2
@@ -162,6 +199,8 @@ window_rule=is_tag_silent:1,app_id:^(steam|discord)$
 The first rule marks foot as the terminal. When a graphical program started from foot opens, it takes the terminal's place, and the terminal comes back when the program exits. The second turns VRR on for any window while it's fullscreen; Mango requires an `app_id` or `title` in every rule, so `.*` stands for all of them. Narrow it to `^(steam_app_.*|gamescope)$` if you'd rather keep fullscreen video at a fixed refresh rate. The third floats Steam's friends list and settings window instead of giving them a column.
 
 The next three are for games. Steam starts every game with an app id of `steam_app_` followed by the game's number. `confine_pointer` keeps the cursor inside the game while it has focus, so a mouse flick in a shooter doesn't land on the other monitor. `idle_inhibit_when_focus` keeps the screen from locking or turning off while a game is focused, windowed or not; [Locking, screens off, and games](#locking-screens-off-and-games) explains why that needs help. `is_tag_silent` stops Steam and Discord from pulling you to their tag when they ask for attention, such as an update window or a message in the middle of a game. Mango marks their window urgent instead, and the bar shows its tag in red.
+
+The last rule always opens Discord on tag 5 of the 24", and `is_open_silent` keeps it from taking the focus, so at login it doesn't pull you away from Firefox.
 
 The commented lines are tearing, which lets a fullscreen game show a frame as soon as it's ready instead of waiting for the monitor's refresh. It lowers latency, at the cost of a visible line where two frames meet. Mango's documentation says some cards also need `WLR_DRM_NO_ATOMIC`, which changes how Mango drives the monitors. Try it with a game you know before keeping it, and log out and back in after adding the `env` line.
 
@@ -233,9 +272,9 @@ bind=SUPER+SHIFT,space,switch_layout,
 bind=SUPER,space,switch_keyboard_layout,
 bind=SUPER+ALT,0,togglegaps,
 
-bind=SUPER,1,view,1
-bind=SUPER+SHIFT,1,tag,1
-# ...the same pair for tags 2 to 9
+bind=SUPER,1,spawn,/usr/local/bin/mango-tag 1
+bind=SUPER+SHIFT,1,tagcrossmon,1,DP-2
+# ...the same pair for tags 2 to 4, and for 5 to 8 with DP-1
 
 bind=SUPER,period,focusmon,next
 bind=SUPER+SHIFT,period,tagmon,next
@@ -267,7 +306,7 @@ bind=SUPER+SHIFT,q,quit
 | Super+drag | left button moves a floating window or swaps two tiled ones; right button resizes |
 | Super+space | switch between the US and Latin American layouts |
 | Super+Shift+space | cycle scroller, tile and monocle |
-| Super+1 to 9, Super+Shift+1 to 9 | view a tag, move the window to a tag; the current tag's number goes back to the previous tag |
+| Super+1 to 8, Super+Shift+1 to 8 | view a tag, move the window to a tag; 1 to 4 are on the 27", 5 to 8 on the 24", and the number of the tag on screen goes back to the previous one |
 | Super+period | focus the other monitor |
 | Super+Shift+period | move the window to the other monitor |
 | Super+n | nnn in a terminal |
@@ -1274,7 +1313,7 @@ kew publishes what it's playing over MPRIS under the name `kew`, which is how th
 sudo dnf install foot wmenu swaybg libnotify swayidle wlopm firefox discord playerctl jq \
   wl-clipboard cliphist grim slurp grimpicker \
   xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-user-dirs \
-  nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui \
+  nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui xdg-utils gawk \
   google-noto-color-emoji-fonts
 xdg-user-dirs-update
 ```
@@ -1295,7 +1334,7 @@ sudo dnf install wl-clip-persist
 | `swaybg` | background |
 | `libnotify` | `notify-send`, to test the notifications |
 | `playerctl` | play, pause and skip in kew or any other MPRIS player from a shell: `playerctl -p kew play-pause` |
-| `jq` | reads the JSON `mmsg` prints: `mmsg get focusing-client \| jq -r .title` |
+| `jq` | reads the JSON `mmsg` prints; `mango-tag` uses it to find the focused monitor |
 | `swayidle`, `wlopm` | lock screen after ten minutes idle, monitors off after fifteen |
 | `wl-clipboard`, `cliphist` | `wl-copy`/`wl-paste` (Neovim uses them for the system clipboard) and the clipboard history behind Super+v |
 | `wl-clip-persist` | keeps the clipboard when the program you copied from closes; without it, `wl-paste` finds nothing |
@@ -1303,11 +1342,86 @@ sudo dnf install wl-clip-persist
 | `grimpicker` | color picker; Fedora builds it from sway-contrib as its own package, without sway |
 | `xdg-desktop-portal-wlr`, `-gtk` | screen sharing in browsers, Discord and OBS, plus file pickers |
 | `nnn`, `zathura`, `imv`, `mpv` | files, PDFs, images, video |
+| `xdg-utils`, `gawk` | `xdg-open`, which nnn uses to open files; it reads `mimeapps.list` with `awk` but doesn't install it |
 | `NetworkManager-tui` | `nmtui`, a menu for Wi-Fi and network connections |
 
 PipeWire and WirePlumber came with `@multimedia` in part 1. `xdg-user-dirs-update` creates `~/Pictures` and the other standard folders; the Print binding saves there.
 
 Quickshell shows the notifications and the polkit prompt, so the list has no notification daemon or polkit agent. Don't add a separate notification daemon either: its D-Bus service file starts it whenever a notification arrives while nothing owns the notification name, for example before `qs` is up at login, and after that it keeps the notifications.
+
+### Default applications
+
+nnn opens files with `xdg-open`, and Firefox and other GTK programs use GLib's lookup. Both look for the program in `~/.config/mimeapps.list`. Without that file they take whichever installed program claims the file type: PDFs happen to land in zathura, but kew claims folders, so "Open folder" in Firefox starts the music player. Neovim and kew also claim text and audio, and both need a terminal that neither tool opens for them, so nothing shows up.
+
+```ini title="~/dotfiles/mime/.config/mimeapps.list"
+[Default Applications]
+application/pdf=org.pwmt.zathura-pdf-mupdf.desktop
+application/epub+zip=org.pwmt.zathura-pdf-mupdf.desktop
+
+image/png=imv-dir.desktop
+image/jpeg=imv-dir.desktop
+image/gif=imv-dir.desktop
+image/webp=imv-dir.desktop
+image/bmp=imv-dir.desktop
+image/svg+xml=imv-dir.desktop
+image/avif=imv-dir.desktop
+
+video/mp4=mpv.desktop
+video/x-matroska=mpv.desktop
+video/webm=mpv.desktop
+video/quicktime=mpv.desktop
+video/x-msvideo=mpv.desktop
+
+audio/mpeg=mpv.desktop
+audio/flac=mpv.desktop
+audio/ogg=mpv.desktop
+audio/opus=mpv.desktop
+audio/wav=mpv.desktop
+audio/x-wav=mpv.desktop
+audio/mp4=mpv.desktop
+audio/x-m4a=mpv.desktop
+
+text/plain=foot-nvim.desktop
+text/markdown=foot-nvim.desktop
+application/json=foot-nvim.desktop
+application/x-shellscript=foot-nvim.desktop
+text/x-shellscript=foot-nvim.desktop
+
+inode/directory=foot-nnn.desktop
+
+text/html=org.mozilla.firefox.desktop
+x-scheme-handler/http=org.mozilla.firefox.desktop
+x-scheme-handler/https=org.mozilla.firefox.desktop
+```
+
+`imv-dir` opens the image and lets you step through the rest of its folder. A single audio file goes to mpv, and kew stays for the music library. Text and folders go to two desktop files of my own, which open a foot window and run Neovim or nnn inside it:
+
+```ini title="~/dotfiles/mime/.local/share/applications/foot-nvim.desktop"
+[Desktop Entry]
+Type=Application
+Name=Neovim in foot
+Exec=foot -e nvim %F
+NoDisplay=true
+MimeType=text/plain;text/markdown;application/json;application/x-shellscript;text/x-shellscript;
+```
+
+```ini title="~/dotfiles/mime/.local/share/applications/foot-nnn.desktop"
+[Desktop Entry]
+Type=Application
+Name=nnn in foot
+Exec=foot -e nnn %f
+NoDisplay=true
+MimeType=inode/directory;
+```
+
+Inside nnn, a text file opens in Neovim in the same window instead. `NNN_OPTS=e` makes nnn hand text files to `$EDITOR`, and Fedora sets `EDITOR` to nano unless something sets it first. Set in Mango's config, both reach every program in the session, including the shell in foot and the nnn behind Super+n:
+
+```ini title="~/dotfiles/mango/.config/mango/config.conf"
+env=EDITOR,nvim
+env=NNN_OPTS,e
+```
+
+Log out and back in for the two variables to apply. `xdg-open` needs `gawk` to read `mimeapps.list`, which is why it's in the package list; without it, it falls back to the guesses above. Firefox and `xdg-mime default` rewrite `mimeapps.list` when you change a default through them, and that replaces Stow's link with a plain file, so change it in the repository instead.
 
 ### Locking, screens off, and games
 
