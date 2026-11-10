@@ -18,6 +18,7 @@ ShellRoot {
     readonly property color bg: "#151515"
     readonly property color fg: "#e8e3e3"
     readonly property color muted: "#a39d9d"
+    readonly property color blue: "#8da3b9"
     readonly property color red: "#b66467"
     readonly property color border: "#424242"
 
@@ -74,6 +75,53 @@ ShellRoot {
     MmsgWatch {
         command: ["mmsg", "watch", "focusing-client"]
         onMessage: c => root.windowTitle = c.title ?? ""
+    }
+
+    // Active keyboard layout. Mango reports the XKB name ("English (US)");
+    // the bar shows the short code, or the full name for a layout not listed.
+    property string keyboardLayout: ""
+    MmsgWatch {
+        command: ["mmsg", "watch", "keyboardlayout"]
+        onMessage: k => root.keyboardLayout = k.layout ?? ""
+    }
+    readonly property var layoutCodes: ({
+        "English (US)": "us",
+        "Spanish (Latin American)": "latam"
+    })
+
+    // Caffeine: while it's on, an idle inhibitor keeps swayidle from locking
+    // the screen or turning the monitors off. `qs ipc call idle toggle`
+    // switches it (Super+Shift+i).
+    property bool caffeine: false
+    IpcHandler {
+        target: "idle"
+        function toggle(): void {
+            root.caffeine = !root.caffeine;
+        }
+    }
+    // The inhibitor needs a window. This one is 1x1, transparent and below
+    // every window, and lets clicks through, so hiding the bar doesn't drop it.
+    LazyLoader {
+        active: root.caffeine
+
+        PanelWindow {
+            id: awake
+            anchors {
+                top: true
+                left: true
+            }
+            implicitWidth: 1
+            implicitHeight: 1
+            exclusionMode: ExclusionMode.Ignore
+            color: "transparent"
+            mask: Region {}
+            WlrLayershell.layer: WlrLayer.Background
+
+            IdleInhibitor {
+                window: awake
+                enabled: true
+            }
+        }
     }
 
     // kew's built-in MPRIS server; any other MPRIS player is ignored.
@@ -209,13 +257,39 @@ ShellRoot {
     // Notifications. Each popup closes after the time the program asked for,
     // 5 s by default; critical ones stay until clicked. Left click runs the
     // default action, or dismisses; right click dismisses.
+    // Every notification also goes into the history, newest first, up to 50.
+    // Do not disturb skips the popup, except for critical ones.
+    property bool dnd: false
+    property var notificationHistory: []
     NotificationServer {
         id: notifications
         keepOnReload: false
         actionsSupported: true
         bodyMarkupSupported: true
         imageSupported: true
-        onNotification: n => n.tracked = true
+        onNotification: n => {
+            const critical = n.urgency === NotificationUrgency.Critical;
+            root.notificationHistory = [{
+                app: n.appName,
+                summary: n.summary,
+                body: n.body,
+                time: new Date(),
+                critical: critical
+            }].concat(root.notificationHistory).slice(0, 50);
+            if (!root.dnd || critical)
+                n.tracked = true;
+        }
+    }
+    // `qs ipc call notifications dnd` toggles do not disturb; `clear`
+    // empties the history.
+    IpcHandler {
+        target: "notifications"
+        function dnd(): void {
+            root.dnd = !root.dnd;
+        }
+        function clear(): void {
+            root.notificationHistory = [];
+        }
     }
     function notificationIcon(n: Notification): string {
         if (n.image !== "")
@@ -490,7 +564,8 @@ ShellRoot {
                 text: root.windowTitle
             }
 
-            // Right: music, volume, mic, clock, tray.
+            // Right: music, volume, mic, keyboard layout, caffeine,
+            // notifications, clock, tray.
             RowLayout {
                 id: right
                 anchors.right: parent.right
@@ -573,6 +648,144 @@ ShellRoot {
                 Volume {
                     label: "mic"
                     node: Pipewire.defaultAudioSource
+                }
+
+                // Keyboard layout; a click switches to the next one.
+                Label {
+                    visible: text !== ""
+                    text: root.layoutCodes[root.keyboardLayout] ?? root.keyboardLayout
+                    color: root.muted
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: Quickshell.execDetached(["mmsg", "dispatch", "switch_keyboard_layout"])
+                    }
+                }
+
+                // Shown while caffeine is on; a click turns it off.
+                Label {
+                    visible: root.caffeine
+                    text: "awake"
+                    color: root.blue
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.caffeine = false
+                    }
+                }
+
+                // Notification count. Left click lists the history, right
+                // click toggles do not disturb. A click elsewhere closes it.
+                Label {
+                    id: notif
+                    readonly property int count: root.notificationHistory.length
+                    text: `${root.dnd ? "dnd" : "notif"} ${count}`
+                    color: root.dnd ? root.blue : count > 0 ? root.fg : root.muted
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton)
+                                root.dnd = !root.dnd;
+                            else
+                                history.visible = !history.visible;
+                        }
+                    }
+
+                    PopupWindow {
+                        id: history
+                        // Just below the bar, right edge under the label.
+                        anchor.item: notif
+                        anchor.rect.x: notif.width - width
+                        anchor.rect.y: bar.height - right.y - notif.y
+                        grabFocus: true
+                        implicitWidth: 400
+                        implicitHeight: Math.min(entries.implicitHeight, 600) + 4
+                        color: root.border
+
+                        Flickable {
+                            x: 2
+                            y: 2
+                            width: history.width - 4
+                            height: history.height - 4
+                            contentHeight: entries.implicitHeight
+                            clip: true
+
+                            Column {
+                                id: entries
+                                width: history.width - 4
+
+                                // Header: clears everything.
+                                Rectangle {
+                                    width: entries.width
+                                    height: 28
+                                    color: clearHover.containsMouse ? root.border : root.bg
+                                    Label {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: 12
+                                        text: notif.count > 0 ? "clear all" : "no notifications"
+                                        color: root.muted
+                                    }
+                                    MouseArea {
+                                        id: clearHover
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: root.notificationHistory = []
+                                    }
+                                }
+
+                                // One entry per notification; a click removes it.
+                                Repeater {
+                                    model: root.notificationHistory
+
+                                    Rectangle {
+                                        id: entry
+                                        required property var modelData
+                                        required property int index
+                                        width: entries.width
+                                        height: lines.implicitHeight + 16
+                                        color: entryHover.containsMouse ? root.border : root.bg
+
+                                        Column {
+                                            id: lines
+                                            x: 12
+                                            y: 8
+                                            width: parent.width - 24
+                                            spacing: 2
+
+                                            Label {
+                                                width: parent.width
+                                                text: `${Qt.formatTime(entry.modelData.time, "HH:mm")} ${entry.modelData.app}`
+                                                color: entry.modelData.critical ? root.red : root.muted
+                                                elide: Text.ElideRight
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                text: entry.modelData.summary
+                                                textFormat: Text.PlainText
+                                                font.bold: true
+                                                elide: Text.ElideRight
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                visible: text !== ""
+                                                text: entry.modelData.body
+                                                textFormat: Text.StyledText
+                                                wrapMode: Text.Wrap
+                                                maximumLineCount: 3
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                        MouseArea {
+                                            id: entryHover
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: root.notificationHistory = root.notificationHistory
+                                                .filter((_, i) => i !== entry.index)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Label {

@@ -79,6 +79,8 @@ Replace `DP-1` and `DP-2` with the names `mmsg get all-monitors` or `wlr-randr` 
 tag_num=9
 tag_rule=id:*,layout_name:scroller
 circle_layout=scroller,tile,monocle
+monocle_tab_mode=0
+view_current_to_back=1
 
 # new windows take 80% of the width; Super+r cycles through the presets
 scroller_default_proportion=0.8
@@ -90,7 +92,7 @@ scroller_prefer_overspread=0
 scroller_focus_center=1
 ```
 
-`tag_rule=id:*` applies the scroller to every tag on both monitors. New windows open at 80% of the screen width, so the neighbouring window always shows at the edge, and the focused one stays centred while you move through the strip. Super+Shift+space still switches a tag to `tile` or `monocle` when a scrolling strip isn't what you want.
+`tag_rule=id:*` applies the scroller to every tag on both monitors. New windows open at 80% of the screen width, so the neighbouring window always shows at the edge, and the focused one stays centred while you move through the strip. Super+Shift+space still switches a tag to `tile` or `monocle` when a scrolling strip isn't what you want. Monocle normally draws a tab bar over its windows, in Mango's own colors and with rounded corners; `monocle_tab_mode=0` turns it off. With `view_current_to_back=1`, pressing Super and the number of the tag you're already on goes back to the tag you came from.
 
 ### Look
 
@@ -105,6 +107,19 @@ root_color=0x151515ff
 border_color=0x424242ff
 focus_color=0x8da3b9ff
 urgent_color=0xb66467ff
+scratchpad_color=0xa988b0ff
+global_color=0x8aa6a2ff
+overlay_color=0xd9bc8cff
+maximized_screen_color=0x8c977dff
+
+jump_label_decorate_fg_color=0xe8e3e3ff
+jump_label_decorate_bg_color=0x151515ff
+jump_label_decorate_focus_fg_color=0x151515ff
+jump_label_decorate_focus_bg_color=0x8da3b9ff
+jump_label_decorate_border_color=0x424242ff
+jump_label_decorate_border_width=2
+jump_label_decorate_corner_radius=0
+jump_label_decorate_font_desc=Maple Mono Bold 16
 
 animations=0
 layer_animations=0
@@ -114,7 +129,7 @@ shadows=0
 layer_shadows=0
 ```
 
-The colors are the [Paradise](https://github.com/paradise-theme/paradise) palette, the one this site uses, written as `0xRRGGBBAA`. Mango draws through scenefx, which can round corners and add blur, shadows and animations. I turn all of it off. Rounded corners come out jagged on NVIDIA's driver ([mango#1387](https://github.com/mangowm/mango/issues/1387)), so `border_radius=0` is more than taste, and without animations the [NVIDIA bug](#nvidia) below is easier to tell apart from an effect.
+The colors are the [Paradise](https://github.com/paradise-theme/paradise) palette, the one this site uses, written as `0xRRGGBBAA`. The four after `urgent_color` are the borders of windows in the scratchpad, pinned to every tag, kept above the rest or maximized, all states the keybinds below put a window in. The `jump_label_decorate_*` lines style the letters that jump mode puts over each window. Mango draws through scenefx, which can round corners and add blur, shadows and animations. I turn all of it off. Rounded corners come out jagged on NVIDIA's driver ([mango#1387](https://github.com/mangowm/mango/issues/1387)), so `border_radius=0` is more than taste, and without animations the [NVIDIA bug](#nvidia) below is easier to tell apart from an effect.
 
 ### Autostart
 
@@ -126,7 +141,7 @@ exec_once=/usr/local/bin/mango-idle
 exec_once=qs
 ```
 
-Note the underscore: `exec_once` runs a command once at login, and `exec` runs it again on every reload. Mango exports its environment to systemd and D-Bus and starts a `mango-session.target` by itself, so nothing here does that; the screen-sharing portal finds the session without help. `qs` is Quickshell, which draws the status bar, the volume OSD, the notifications and the polkit password prompt. `wl-clip-persist` keeps what you copied after the program you copied it from closes. `mango-idle` is a short script covered in [Locking, screens off, and games](#locking-screens-off-and-games).
+`exec_once` runs a command once at login, and `exec` runs it again on every reload. Mango exports its environment to systemd and D-Bus and starts a `mango-session.target` by itself, so nothing here does that; the screen-sharing portal finds the session without help. `qs` is Quickshell, which draws the status bar, the volume OSD, the notifications and the polkit password prompt. `wl-clip-persist` keeps what you copied after the program you copied it from closes. `mango-idle` is a short script covered in [Locking, screens off, and games](#locking-screens-off-and-games).
 
 ### Window rules
 
@@ -134,9 +149,21 @@ Note the underscore: `exec_once` runs a command once at login, and `exec` runs i
 window_rule=is_term:1,app_id:^foot$
 window_rule=vrr_only_fullscreen:1,app_id:.*
 window_rule=is_floating:1,app_id:^steam$,title:^(Friends List|Steam Settings)$
+window_rule=confine_pointer:1,app_id:^steam_app_.*$
+window_rule=idle_inhibit_when_focus:1,app_id:^(steam_app_.*|gamescope)$
+window_rule=is_tag_silent:1,app_id:^(steam|discord)$
+
+# to try: tearing in fullscreen games
+#allow_tearing=2
+#window_rule=force_tearing:1,app_id:^steam_app_.*$
+#env=WLR_DRM_NO_ATOMIC,1
 ```
 
 The first rule marks foot as the terminal. When a graphical program started from foot opens, it takes the terminal's place, and the terminal comes back when the program exits. The second turns VRR on for any window while it's fullscreen; Mango requires an `app_id` or `title` in every rule, so `.*` stands for all of them. Narrow it to `^(steam_app_.*|gamescope)$` if you'd rather keep fullscreen video at a fixed refresh rate. The third floats Steam's friends list and settings window instead of giving them a column.
+
+The next three are for games. Steam starts every game with an app id of `steam_app_` followed by the game's number. `confine_pointer` keeps the cursor inside the game while it has focus, so a mouse flick in a shooter doesn't land on the other monitor. `idle_inhibit_when_focus` keeps the screen from locking or turning off while a game is focused, windowed or not; [Locking, screens off, and games](#locking-screens-off-and-games) explains why that needs help. `is_tag_silent` stops Steam and Discord from pulling you to their tag when they ask for attention, such as an update window or a message in the middle of a game. Mango marks their window urgent instead, and the bar shows its tag in red.
+
+The commented lines are tearing, which lets a fullscreen game show a frame as soon as it's ready instead of waiting for the monitor's refresh. It lowers latency, at the cost of a visible line where two frames meet. Mango's documentation says some cards also need `WLR_DRM_NO_ATOMIC`, which changes how Mango drives the monitors. Try it with a game you know before keeping it, and log out and back in after adding the `env` line.
 
 ### Keyboard layouts
 
@@ -144,7 +171,7 @@ The first rule marks foot as the terminal. When a graphical program started from
 xkb_rules_layout=us,latam
 ```
 
-US comes first, so it's the layout Mango starts with. Super+space switches to Latin American Spanish and back, and `mmsg get keyboardlayout` prints the active one. `bind` matches the physical key, so the bindings below keep working while latam is active.
+US comes first, so it's the layout Mango starts with. Super+space switches to Latin American Spanish and back; the bar shows the active one, and `mmsg get keyboardlayout` prints it. `bind` matches the physical key, so the bindings below keep working while latam is active.
 
 ### Keybinds
 
@@ -158,7 +185,7 @@ bind=SUPER,v,spawn_shell,cliphist list | wmenu -l 10 -f 'Maple Mono 11' -N 15151
 bind=SUPER+SHIFT,s,spawn_shell,grim -g "$(slurp)" - | wl-copy
 bind=NONE,Print,spawn_shell,grim "$HOME/Pictures/$(date +%F_%H-%M-%S).png"
 bind=SUPER+SHIFT,x,spawn,grimpicker --copy --notify
-bind=SUPER+SHIFT,i,spawn_shell,pkill -x swayidle && notify-send 'Idle' 'Lock and screen-off disabled' || { /usr/local/bin/mango-idle & notify-send 'Idle' 'Lock and screen-off enabled'; }
+bind=SUPER+SHIFT,i,spawn,qs ipc call idle toggle
 bind=SUPER,b,spawn,qs ipc call bar toggle
 bind=SUPER,o,spawn,qs ipc call audio next
 bindl=SUPER,Escape,spawn,/usr/local/bin/mango-lock
@@ -186,9 +213,18 @@ bind=SUPER,r,switch_proportion_preset,next
 bind=SUPER,e,set_proportion,1.0
 bind=SUPER,f,togglefullscreen,
 bind=SUPER+SHIFT,f,togglefloating,
-bind=SUPER,q,killclient,
+bind=SUPER+SHIFT,e,togglemaximizescreen,
+bind=SUPER,g,toggleglobal,
+bind=SUPER+SHIFT,g,toggleoverlay,
+bind=SUPER,Tab,togglejump,
+bind=SUPER,w,killclient,
 mousebind=SUPER,btn_left,moveresize,curmove
 mousebind=SUPER,btn_right,moveresize,curresize
+drag_tile_to_tile=1
+
+bind=SUPER+SHIFT,minus,minimized,
+bind=SUPER,minus,toggle_scratchpad,
+bind=SUPER+CTRL,minus,restore_minimized,
 
 bind=SUPER,c,setlayout,scroller
 bind=SUPER,t,setlayout,tile
@@ -201,10 +237,8 @@ bind=SUPER,1,view,1
 bind=SUPER+SHIFT,1,tag,1
 # ...the same pair for tags 2 to 9
 
-bind=SUPER,comma,focusmon,left
-bind=SUPER,period,focusmon,right
-bind=SUPER+SHIFT,comma,tagmon,left
-bind=SUPER+SHIFT,period,tagmon,right
+bind=SUPER,period,focusmon,next
+bind=SUPER+SHIFT,period,tagmon,next
 
 bind=SUPER+SHIFT,r,reload_config
 bind=SUPER+SHIFT,q,quit
@@ -214,7 +248,7 @@ bind=SUPER+SHIFT,q,quit
 | --- | --- |
 | Super+Return | terminal |
 | Super+p | launcher (wmenu) |
-| Super+h/j/k/l | focus left, down, up, right |
+| Super+h/j/k/l | focus left, down, up, right, without leaving the monitor |
 | Super+Shift+h/j/k/l | move the window in that direction |
 | Super+Ctrl+h/j/k/l | stack the window into the neighbouring column, or pull it out |
 | Super+r | cycle the window width: 50%, 80%, 100% |
@@ -222,18 +256,27 @@ bind=SUPER+SHIFT,q,quit
 | Super+s | back to the previous window |
 | Super+f | fullscreen |
 | Super+Shift+f | float the window, or tile it again |
-| Super+q | close the window |
+| Super+Shift+e | maximize the window, keeping the bar |
+| Super+g | pin the window to every tag of its monitor, or unpin it |
+| Super+Shift+g | draw the window above all others, or stop |
+| Super+Tab | jump mode: a letter on every window, press one to go there or Escape to stay |
+| Super+Shift+minus | hide the window in the scratchpad |
+| Super+minus | show the scratchpad over the current tag, or hide it |
+| Super+Ctrl+minus | bring the window back from the scratchpad to the tag |
+| Super+w | close the window |
+| Super+drag | left button moves a floating window or swaps two tiled ones; right button resizes |
 | Super+space | switch between the US and Latin American layouts |
 | Super+Shift+space | cycle scroller, tile and monocle |
-| Super+1 to 9, Super+Shift+1 to 9 | view a tag, move the window to a tag |
-| Super+comma/period | focus the left or right monitor |
+| Super+1 to 9, Super+Shift+1 to 9 | view a tag, move the window to a tag; the current tag's number goes back to the previous tag |
+| Super+period | focus the other monitor |
+| Super+Shift+period | move the window to the other monitor |
 | Super+n | nnn in a terminal |
 | Super+v | pick an entry from the clipboard history |
 | Super+Shift+s | screenshot of a region, to the clipboard |
 | Print | screenshot of everything, to `~/Pictures` |
 | Super+Shift+x | pick a color, copy its hex code |
 | Super+Escape | lock the screen |
-| Super+Shift+i | turn the automatic lock and screen-off off or back on |
+| Super+Shift+i | caffeine: keep the screen from locking or turning off, or stop |
 | Super+b | show or hide the bar |
 | Super+o | switch to the next audio output |
 | Super+scroll | volume |
@@ -283,9 +326,9 @@ sudo systemctl set-default graphical.target
 
 Quickshell is a toolkit for writing desktop shells in QML, the declarative language Qt uses for interfaces. The whole shell is one QML file that Quickshell reloads every time you save it. Mine has four parts:
 
-- A bar docked along the top of each monitor, from one corner to the other, with the tags on the left, the focused window's title in the middle, and the current song, volume, microphone, date and the system tray on the right. Right-clicking the volume lists the audio outputs.
+- A bar docked along the top of each monitor, from one corner to the other, with the tags on the left, the focused window's title in the middle, and the current song, volume, microphone, keyboard layout, notification count, date and the system tray on the right.
 - A volume OSD, a small box that shows the output, a level bar and the percentage for a moment whenever the volume changes.
-- Notification popups.
+- Notification popups, a history of them and a do-not-disturb switch.
 - The password prompt for programs that ask polkit for privileges.
 
 The lock screen is also written in Quickshell, in a separate file that runs as its own process. It's covered in [Locking, screens off, and games](#locking-screens-off-and-games).
@@ -320,6 +363,7 @@ ShellRoot {
     readonly property color bg: "#151515"
     readonly property color fg: "#e8e3e3"
     readonly property color muted: "#a39d9d"
+    readonly property color blue: "#8da3b9"
     readonly property color red: "#b66467"
     readonly property color border: "#424242"
 
@@ -376,6 +420,53 @@ ShellRoot {
     MmsgWatch {
         command: ["mmsg", "watch", "focusing-client"]
         onMessage: c => root.windowTitle = c.title ?? ""
+    }
+
+    // Active keyboard layout. Mango reports the XKB name ("English (US)");
+    // the bar shows the short code, or the full name for a layout not listed.
+    property string keyboardLayout: ""
+    MmsgWatch {
+        command: ["mmsg", "watch", "keyboardlayout"]
+        onMessage: k => root.keyboardLayout = k.layout ?? ""
+    }
+    readonly property var layoutCodes: ({
+        "English (US)": "us",
+        "Spanish (Latin American)": "latam"
+    })
+
+    // Caffeine: while it's on, an idle inhibitor keeps swayidle from locking
+    // the screen or turning the monitors off. `qs ipc call idle toggle`
+    // switches it (Super+Shift+i).
+    property bool caffeine: false
+    IpcHandler {
+        target: "idle"
+        function toggle(): void {
+            root.caffeine = !root.caffeine;
+        }
+    }
+    // The inhibitor needs a window. This one is 1x1, transparent and below
+    // every window, and lets clicks through, so hiding the bar doesn't drop it.
+    LazyLoader {
+        active: root.caffeine
+
+        PanelWindow {
+            id: awake
+            anchors {
+                top: true
+                left: true
+            }
+            implicitWidth: 1
+            implicitHeight: 1
+            exclusionMode: ExclusionMode.Ignore
+            color: "transparent"
+            mask: Region {}
+            WlrLayershell.layer: WlrLayer.Background
+
+            IdleInhibitor {
+                window: awake
+                enabled: true
+            }
+        }
     }
 
     // kew's built-in MPRIS server; any other MPRIS player is ignored.
@@ -511,13 +602,39 @@ ShellRoot {
     // Notifications. Each popup closes after the time the program asked for,
     // 5 s by default; critical ones stay until clicked. Left click runs the
     // default action, or dismisses; right click dismisses.
+    // Every notification also goes into the history, newest first, up to 50.
+    // Do not disturb skips the popup, except for critical ones.
+    property bool dnd: false
+    property var notificationHistory: []
     NotificationServer {
         id: notifications
         keepOnReload: false
         actionsSupported: true
         bodyMarkupSupported: true
         imageSupported: true
-        onNotification: n => n.tracked = true
+        onNotification: n => {
+            const critical = n.urgency === NotificationUrgency.Critical;
+            root.notificationHistory = [{
+                app: n.appName,
+                summary: n.summary,
+                body: n.body,
+                time: new Date(),
+                critical: critical
+            }].concat(root.notificationHistory).slice(0, 50);
+            if (!root.dnd || critical)
+                n.tracked = true;
+        }
+    }
+    // `qs ipc call notifications dnd` toggles do not disturb; `clear`
+    // empties the history.
+    IpcHandler {
+        target: "notifications"
+        function dnd(): void {
+            root.dnd = !root.dnd;
+        }
+        function clear(): void {
+            root.notificationHistory = [];
+        }
     }
     function notificationIcon(n: Notification): string {
         if (n.image !== "")
@@ -792,7 +909,8 @@ ShellRoot {
                 text: root.windowTitle
             }
 
-            // Right: music, volume, mic, clock, tray.
+            // Right: music, volume, mic, keyboard layout, caffeine,
+            // notifications, clock, tray.
             RowLayout {
                 id: right
                 anchors.right: parent.right
@@ -877,6 +995,144 @@ ShellRoot {
                     node: Pipewire.defaultAudioSource
                 }
 
+                // Keyboard layout; a click switches to the next one.
+                Label {
+                    visible: text !== ""
+                    text: root.layoutCodes[root.keyboardLayout] ?? root.keyboardLayout
+                    color: root.muted
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: Quickshell.execDetached(["mmsg", "dispatch", "switch_keyboard_layout"])
+                    }
+                }
+
+                // Shown while caffeine is on; a click turns it off.
+                Label {
+                    visible: root.caffeine
+                    text: "awake"
+                    color: root.blue
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.caffeine = false
+                    }
+                }
+
+                // Notification count. Left click lists the history, right
+                // click toggles do not disturb. A click elsewhere closes it.
+                Label {
+                    id: notif
+                    readonly property int count: root.notificationHistory.length
+                    text: `${root.dnd ? "dnd" : "notif"} ${count}`
+                    color: root.dnd ? root.blue : count > 0 ? root.fg : root.muted
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton)
+                                root.dnd = !root.dnd;
+                            else
+                                history.visible = !history.visible;
+                        }
+                    }
+
+                    PopupWindow {
+                        id: history
+                        // Just below the bar, right edge under the label.
+                        anchor.item: notif
+                        anchor.rect.x: notif.width - width
+                        anchor.rect.y: bar.height - right.y - notif.y
+                        grabFocus: true
+                        implicitWidth: 400
+                        implicitHeight: Math.min(entries.implicitHeight, 600) + 4
+                        color: root.border
+
+                        Flickable {
+                            x: 2
+                            y: 2
+                            width: history.width - 4
+                            height: history.height - 4
+                            contentHeight: entries.implicitHeight
+                            clip: true
+
+                            Column {
+                                id: entries
+                                width: history.width - 4
+
+                                // Header: clears everything.
+                                Rectangle {
+                                    width: entries.width
+                                    height: 28
+                                    color: clearHover.containsMouse ? root.border : root.bg
+                                    Label {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: 12
+                                        text: notif.count > 0 ? "clear all" : "no notifications"
+                                        color: root.muted
+                                    }
+                                    MouseArea {
+                                        id: clearHover
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: root.notificationHistory = []
+                                    }
+                                }
+
+                                // One entry per notification; a click removes it.
+                                Repeater {
+                                    model: root.notificationHistory
+
+                                    Rectangle {
+                                        id: entry
+                                        required property var modelData
+                                        required property int index
+                                        width: entries.width
+                                        height: lines.implicitHeight + 16
+                                        color: entryHover.containsMouse ? root.border : root.bg
+
+                                        Column {
+                                            id: lines
+                                            x: 12
+                                            y: 8
+                                            width: parent.width - 24
+                                            spacing: 2
+
+                                            Label {
+                                                width: parent.width
+                                                text: `${Qt.formatTime(entry.modelData.time, "HH:mm")} ${entry.modelData.app}`
+                                                color: entry.modelData.critical ? root.red : root.muted
+                                                elide: Text.ElideRight
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                text: entry.modelData.summary
+                                                textFormat: Text.PlainText
+                                                font.bold: true
+                                                elide: Text.ElideRight
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                visible: text !== ""
+                                                text: entry.modelData.body
+                                                textFormat: Text.StyledText
+                                                wrapMode: Text.Wrap
+                                                maximumLineCount: 3
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                        MouseArea {
+                                            id: entryHover
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: root.notificationHistory = root.notificationHistory
+                                                .filter((_, i) => i !== entry.index)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Label {
                     text: Qt.formatDateTime(clock.date, "ddd dd MMM HH:mm")
                 }
@@ -917,22 +1173,11 @@ ShellRoot {
 }
 ```
 
-A few details in it:
+Clicking a tag shows it on that bar's monitor, clicking the song pauses or resumes it, and scrolling over `vol` or `mic` changes the volume, with a click to mute. Clicking the keyboard layout switches to the next one. Right-clicking `vol` lists the audio outputs, and Super+o moves to the next one without opening the list; WirePlumber remembers the choice across reboots. The list only shows separate devices, so headphones in the front jack of the same sound card don't appear there, and WirePlumber switches to them by itself when you plug them in.
 
-- `PanelWindow` with `top`, `left` and `right` anchors is what makes the bar docked and full width. Its default exclusion mode reserves a strip as tall as the bar, so windows never go under it.
-- `Variants` creates one bar per monitor, and each bar watches the tags of its own output.
-- `PwObjectTracker` keeps the default output and input bound. Without it, PipeWire doesn't send their volume.
-- The tray only opens menus because of the `UseQApplication` pragma on the first line.
-- `IpcHandler` gives the shell two commands: `qs ipc call bar toggle`, which Super+b runs, and `qs ipc call audio next`, which Super+o runs.
-- Clicking a tag switches to it on that bar's monitor, clicking the music pauses or resumes it, and scrolling over the volume or microphone changes it, with a click to mute.
-- The title is the focused window's, so both monitors show the same one.
-- Tray menus use Qt's default light style rather than the Paradise colors.
-- The OSD, the notifications and the polkit prompt are layer surfaces without a screen, and `LazyLoader` creates them each time they appear, so Mango puts them on the monitor that has focus.
-- The OSD listens to PipeWire, so it shows whenever the volume changes: from the keys, the bar, Super+scroll or another program. It ignores the changes PipeWire reports while it first syncs at startup. `mask: Region {}` lets clicks through to the window underneath.
-- Right-clicking `vol` lists the outputs, with `●` on the current one. Clicking one switches to it; clicking anywhere else closes the list. Super+o goes to the next output without opening it. Both set PipeWire's preferred output, which WirePlumber remembers across reboots, and the programs that are playing move to it.
-- The list only has separate devices, such as a USB headset, the monitors' DisplayPort audio or Bluetooth. Headphones in the front jack of the same sound card as the speakers don't show up as a second output: PipeWire sees one output with two ports, and WirePlumber switches between them when you plug in.
-- Notifications stack at the top right, below the bar. Each one closes after the time the program asked for, or 5 s; critical ones get a red border and stay. Left click runs the notification's default action, or closes it if it has none, and right click closes it. Quickshell's documentation describes `expireTimeout` in seconds, but it arrives in milliseconds, as `notify-send -t` sends it.
-- The polkit prompt opens in the middle of the screen, above fullscreen windows, and takes the keyboard until it closes. Enter submits the password and Escape cancels. After a wrong password the field turns red and the prompt asks again. Try it with `pkexec true`.
+Clicking `notif` lists the last 50 notifications, newest first; clicking one removes it. Right-clicking `notif` turns on do not disturb, which hides every popup except critical ones while the history keeps recording. The history only keeps the text, and it empties when Quickshell reloads, for example when you save this file. `pkexec true` brings up the polkit prompt if you want to try it.
+
+Three lines in the code aren't obvious from the result. `PwObjectTracker` has to bind the default output and input, or PipeWire never sends their volume. The tray menus only open because of the `UseQApplication` pragma on the first line, and they keep Qt's light style instead of Paradise. And `expireTimeout` arrives in milliseconds, although Quickshell's documentation says seconds.
 
 The file is also [here](/files/mango-0.18/shell.qml) to download.
 
@@ -1026,7 +1271,7 @@ kew publishes what it's playing over MPRIS under the name `kew`, which is how th
 ## The rest of the desktop
 
 ```bash
-sudo dnf install foot wmenu swaybg libnotify swayidle wlopm firefox \
+sudo dnf install foot wmenu swaybg libnotify swayidle wlopm firefox discord playerctl jq \
   wl-clipboard cliphist grim slurp grimpicker \
   xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-user-dirs \
   nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui \
@@ -1045,9 +1290,12 @@ sudo dnf install wl-clip-persist
 | --- | --- |
 | `foot` | terminal |
 | `firefox` | browser |
+| `discord` | Discord; Terra and RPM Fusion both package it, and dnf installs Terra's because it's newer |
 | `wmenu` | launcher; `wmenu-run` lists everything in `$PATH` |
 | `swaybg` | background |
 | `libnotify` | `notify-send`, to test the notifications |
+| `playerctl` | play, pause and skip in kew or any other MPRIS player from a shell: `playerctl -p kew play-pause` |
+| `jq` | reads the JSON `mmsg` prints: `mmsg get focusing-client \| jq -r .title` |
 | `swayidle`, `wlopm` | lock screen after ten minutes idle, monitors off after fifteen |
 | `wl-clipboard`, `cliphist` | `wl-copy`/`wl-paste` (Neovim uses them for the system clipboard) and the clipboard history behind Super+v |
 | `wl-clip-persist` | keeps the clipboard when the program you copied from closes; without it, `wl-paste` finds nothing |
@@ -1210,11 +1458,9 @@ ShellRoot {
 }
 ```
 
-- Both monitors fill in as you type, and the field on the monitor that has the keyboard gets a blue border. Enter checks the password and Escape clears it.
-- A wrong password empties the field and turns it red until you type again. PAM waits two seconds before it answers a wrong one, and the field shows "Checking..." meanwhile.
-- `PamContext` without a `config` uses `/etc/pam.d/login`, so there's no PAM file to write.
-- It doesn't go in `shell.qml` because Quickshell reloads a config every time you save it, and each reload builds a new `WlSessionLock`. If the new one starts unlocked, the screen unlocks. If it starts locked, Quickshell 0.3.2 crashes while taking over the old lock, and the session stays locked with nothing to type the password into. `settings.watchFiles: false` stops `lock.qml` from reloading, so edits to it apply from the next lock on. The bar still reloads on save.
-- The file is also [here](/files/mango-0.18/lock.qml) to download.
+Both monitors show the same field as you type, with a blue border on the one that has the keyboard. A wrong password empties it and turns it red; PAM takes two seconds to reject one, and the field reads "Checking..." meanwhile. `PamContext` without a `config` uses `/etc/pam.d/login`, so there's no PAM file to write.
+
+The lock has its own file because Quickshell reloads a config every time you save it, and Quickshell 0.3.2 crashes when a reload replaces an active lock, which leaves the session locked with no field to type in. `settings.watchFiles: false` turns reloading off for `lock.qml` alone, so changes to it take effect at the next lock. The file is also [here](/files/mango-0.18/lock.qml) to download.
 
 A small script starts it. With `-n`, `qs` exits if that config is already running, so a second lock request does nothing. The loop then waits until Mango confirms every monitor is covered, and swayidle holds off suspend until the script returns:
 
@@ -1231,7 +1477,7 @@ done
 exit 1
 ```
 
-swayidle runs from another script, so the autostart entry and the toggle key start exactly the same thing:
+swayidle runs from another script, which keeps its quoting out of Mango's config:
 
 ```sh title="~/dotfiles/bin/mango-idle"
 #!/bin/sh
@@ -1248,7 +1494,7 @@ sudo install -m 755 ~/dotfiles/bin/mango-idle ~/dotfiles/bin/mango-lock /usr/loc
 
 Super+Escape locks the screen by hand. It's a `bindl`, so it works while locked too. If the lock process dies, Mango keeps the session locked behind a plain dark gray screen, and Super+Escape starts a new lock that takes over.
 
-`wlopm` turns the monitors off through the output power protocol, which Mango implements. Don't use Mango's `disable_monitor` for this on NVIDIA: turning a monitor back on that way can leave it black ([mango#1164](https://github.com/mangowm/mango/issues/1164)).
+`wlopm` turns the monitors off through the output power protocol, which Mango implements.
 
 swayidle only counts keyboard and mouse input as activity. A game played with a controller reads the controller directly, so after ten minutes of only using the gamepad the screen would lock in the middle of the game. Mango has two options for this:
 
@@ -1259,7 +1505,7 @@ idle_inhibit_ignore_visible=1
 
 With the first, Mango reports activity every second while the focused window is fullscreen, so swayidle never reaches its timeout during a fullscreen game. The second covers video: players and browsers ask the compositor not to go idle, and normally Mango only honours that while their window is visible; with it, a video on another tag or monitor also keeps the screen awake.
 
-For windowed games, Super+Shift+i kills swayidle, which stops both the lock and the screen-off, and starts it again on the next press. A notification says which state you're in. `systemd-inhibit --what=idle` would be the obvious tool for this, but swayidle 1.9.0, the version in Fedora 45, fails to read logind's inhibitors ([swayidle#198](https://github.com/swaywm/swayidle/issues/198)), so it ignores them.
+A windowed game from Steam is covered by the `idle_inhibit_when_focus` rule in [Window rules](#window-rules). For anything else, Super+Shift+i turns on caffeine: the bar shows `awake`, and swayidle neither locks the screen nor turns the monitors off until you press it again or click `awake`. Caffeine also turns off when Quickshell reloads, for example after you save `shell.qml`.
 
 ### Screen sharing
 
@@ -1480,7 +1726,7 @@ All of this relies on Firefox's internal variables, and an update can rename one
 
 ## NVIDIA
 
-I started Mango with no extra environment variables and only add one when it fixes something I can see. Mango enables explicit sync by default (`sync_obj_enable=1`), and its documentation has no NVIDIA section; asked about NVIDIA support, its author said he ["can't make any promises"](https://github.com/mangowm/mango/issues/1429). Two reports matter for this machine:
+I started Mango with no extra environment variables and only add one when it fixes something I can see. Mango enables explicit sync by default (`sync_obj_enable=1`), and its documentation has no NVIDIA section. Two reports matter for this machine:
 
 - [mango#1594](https://github.com/mangowm/mango/issues/1594), opened against 0.18.5 with driver 615.78 on a 2560x1440 monitor: with a single window on screen, its right edge glitches and partly disappears. That is my 27" monitor's resolution. Check whether you see it, and follow the issue for a fix.
 - Rounded corners render jagged on NVIDIA ([mango#1387](https://github.com/mangowm/mango/issues/1387)). The fix is waiting in scenefx; `border_radius=0` avoids it.
