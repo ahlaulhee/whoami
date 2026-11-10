@@ -285,8 +285,8 @@ Quickshell is a toolkit for writing desktop shells in QML, the declarative langu
 
 - A bar docked along the top of each monitor, from one corner to the other, with the tags on the left, the focused window's title in the middle, and the current song, volume, microphone, date and the system tray on the right. Right-clicking the volume lists the audio outputs.
 - A volume OSD, a small box that shows the output, a level bar and the percentage for a moment whenever the volume changes.
-- Notification popups, instead of mako.
-- The password prompt for programs that ask polkit for privileges, instead of lxqt-policykit.
+- Notification popups.
+- The password prompt for programs that ask polkit for privileges.
 
 Fedora 45 has Quickshell, but its package is a February 2026 snapshot from before version 0.3. The [errornointernet/quickshell](https://copr.fedorainfracloud.org/coprs/errornointernet/quickshell/) COPR has the current release, 0.3.2, and replaces Fedora's package when enabled:
 
@@ -506,9 +506,9 @@ ShellRoot {
         }
     }
 
-    // Notifications (replaces mako). Each popup closes after the time the
-    // program asked for, 5 s by default; critical ones stay until clicked.
-    // Left click runs the default action, or dismisses; right click dismisses.
+    // Notifications. Each popup closes after the time the program asked for,
+    // 5 s by default; critical ones stay until clicked. Left click runs the
+    // default action, or dismisses; right click dismisses.
     NotificationServer {
         id: notifications
         keepOnReload: false
@@ -629,8 +629,8 @@ ShellRoot {
         }
     }
 
-    // Password prompt for programs that ask polkit for privileges
-    // (replaces lxqt-policykit). Enter submits, Escape cancels.
+    // Password prompt for programs that ask polkit for privileges.
+    // Enter submits, Escape cancels.
     PolkitAgent {
         id: polkit
     }
@@ -1057,7 +1057,7 @@ sudo dnf install wl-clip-persist
 
 PipeWire and WirePlumber came with `@multimedia` in part 1. `xdg-user-dirs-update` creates `~/Pictures` and the other standard folders; the Print binding saves there.
 
-Quickshell shows the notifications and the polkit prompt, so mako and lxqt-policykit aren't in the list. If mako is already installed, remove it with `sudo dnf remove mako`. Its D-Bus service file starts it whenever a notification arrives while nothing owns the notification name, for example before `qs` is up at login, and after that mako keeps the notifications.
+Quickshell shows the notifications and the polkit prompt, so the list has no notification daemon or polkit agent. Don't add a separate notification daemon either: its D-Bus service file starts it whenever a notification arrives while nothing owns the notification name, for example before `qs` is up at login, and after that it keeps the notifications.
 
 ### Locking, screens off, and games
 

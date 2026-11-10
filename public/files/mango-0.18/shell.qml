@@ -206,9 +206,9 @@ ShellRoot {
         }
     }
 
-    // Notifications (replaces mako). Each popup closes after the time the
-    // program asked for, 5 s by default; critical ones stay until clicked.
-    // Left click runs the default action, or dismisses; right click dismisses.
+    // Notifications. Each popup closes after the time the program asked for,
+    // 5 s by default; critical ones stay until clicked. Left click runs the
+    // default action, or dismisses; right click dismisses.
     NotificationServer {
         id: notifications
         keepOnReload: false
@@ -329,8 +329,8 @@ ShellRoot {
         }
     }
 
-    // Password prompt for programs that ask polkit for privileges
-    // (replaces lxqt-policykit). Enter submits, Escape cancels.
+    // Password prompt for programs that ask polkit for privileges.
+    // Enter submits, Escape cancels.
     PolkitAgent {
         id: polkit
     }
