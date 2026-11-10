@@ -33,15 +33,14 @@ All the configuration lives in one git repository, `~/dotfiles`. Each program ge
 
 ```txt
 ~/dotfiles
-├── bin/mango-idle                     # copied to /usr/local/bin
+├── bin/{mango-idle,mango-lock}        # copied to /usr/local/bin
 ├── firefox/chrome/{userChrome,userContent}.css   # linked by hand, see Firefox
 ├── fish/.config/fish/{config.fish,fish_plugins}
 ├── fonts/.local/share/fonts/maple-mono/
 ├── foot/.config/foot/foot.ini
 ├── kew/.config/kew/themes/paradise.theme
 ├── mango/.config/mango/config.conf
-├── quickshell/.config/quickshell/shell.qml
-├── swaylock/.config/swaylock/config
+├── quickshell/.config/quickshell/{shell,lock}.qml
 ├── xdpw/.config/xdg-desktop-portal-wlr/config
 └── zathura/.config/zathura/zathurarc
 ```
@@ -54,10 +53,10 @@ git init ~/dotfiles
 Once the files exist, link them by naming the folders:
 
 ```bash
-stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mango quickshell swaylock xdpw zathura
+stow --no-folding -d ~/dotfiles -t ~ fish fonts foot kew mango quickshell xdpw zathura
 ```
 
-Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` and `firefox` stay out of the list: the script is copied to `/usr/local/bin`, and the Firefox folder goes into a profile whose name Stow can't know.
+Without `--no-folding`, Stow links whole directories when it can, so `~/.config/mango` itself would point into the repo and any file a program creates there would show up in `git status`. With it, Stow creates real directories and links only the files. `bin` and `firefox` stay out of the list: the scripts are copied to `/usr/local/bin`, and the Firefox folder goes into a profile whose name Stow can't know.
 
 ## Configure Mango
 
@@ -159,10 +158,10 @@ bind=SUPER,v,spawn_shell,cliphist list | wmenu -l 10 -f 'Maple Mono 11' -N 15151
 bind=SUPER+SHIFT,s,spawn_shell,grim -g "$(slurp)" - | wl-copy
 bind=NONE,Print,spawn_shell,grim "$HOME/Pictures/$(date +%F_%H-%M-%S).png"
 bind=SUPER+SHIFT,x,spawn,grimpicker --copy --notify
-bind=SUPER,Escape,spawn,swaylock -f
 bind=SUPER+SHIFT,i,spawn_shell,pkill -x swayidle && notify-send 'Idle' 'Lock and screen-off disabled' || { /usr/local/bin/mango-idle & notify-send 'Idle' 'Lock and screen-off enabled'; }
 bind=SUPER,b,spawn,qs ipc call bar toggle
 bind=SUPER,o,spawn,qs ipc call audio next
+bindl=SUPER,Escape,spawn,/usr/local/bin/mango-lock
 
 bindl=NONE,XF86AudioRaiseVolume,spawn,wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
 bindl=NONE,XF86AudioLowerVolume,spawn,wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
@@ -288,6 +287,8 @@ Quickshell is a toolkit for writing desktop shells in QML, the declarative langu
 - A volume OSD, a small box that shows the output, a level bar and the percentage for a moment whenever the volume changes.
 - Notification popups.
 - The password prompt for programs that ask polkit for privileges.
+
+The lock screen is also written in Quickshell, in a separate file that runs as its own process. It's covered in [Locking, screens off, and games](#locking-screens-off-and-games).
 
 Fedora 45 has Quickshell, but its package is a February 2026 snapshot from before version 0.3. The [errornointernet/quickshell](https://copr.fedorainfracloud.org/coprs/errornointernet/quickshell/) COPR has the current release, 0.3.2, and replaces Fedora's package when enabled:
 
@@ -1025,7 +1026,7 @@ kew publishes what it's playing over MPRIS under the name `kew`, which is how th
 ## The rest of the desktop
 
 ```bash
-sudo dnf install foot wmenu swaybg libnotify swaylock swayidle wlopm firefox \
+sudo dnf install foot wmenu swaybg libnotify swayidle wlopm firefox \
   wl-clipboard cliphist grim slurp grimpicker \
   xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-user-dirs \
   nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui \
@@ -1047,7 +1048,7 @@ sudo dnf install wl-clip-persist
 | `wmenu` | launcher; `wmenu-run` lists everything in `$PATH` |
 | `swaybg` | background |
 | `libnotify` | `notify-send`, to test the notifications |
-| `swaylock`, `swayidle`, `wlopm` | lock screen after ten minutes idle, monitors off after fifteen |
+| `swayidle`, `wlopm` | lock screen after ten minutes idle, monitors off after fifteen |
 | `wl-clipboard`, `cliphist` | `wl-copy`/`wl-paste` (Neovim uses them for the system clipboard) and the clipboard history behind Super+v |
 | `wl-clip-persist` | keeps the clipboard when the program you copied from closes; without it, `wl-paste` finds nothing |
 | `grim`, `slurp` | screenshots, whole screen or a selected region |
@@ -1062,20 +1063,190 @@ Quickshell shows the notifications and the polkit prompt, so the list has no not
 
 ### Locking, screens off, and games
 
-swayidle runs from a small script, so the autostart entry and the toggle key start exactly the same thing:
+The lock screen is a second Quickshell config, `lock.qml`, next to the bar's `shell.qml`. It runs as its own process, which covers every monitor as soon as it starts and exits after the right password. Each monitor shows the time, the date and a password field.
+
+```qml title="~/dotfiles/quickshell/.config/quickshell/lock.qml"
+// Lock screen, one Quickshell process per lock: mango-lock starts it, it
+// covers every monitor as soon as it loads and exits after the password.
+pragma ComponentBehavior: Bound
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Io
+import Quickshell.Services.Pam
+import Quickshell.Wayland
+
+ShellRoot {
+    id: root
+    // A reload replaces the lock with a new one, which Quickshell 0.3.2
+    // can't do while locked: it crashes and leaves the session locked.
+    settings.watchFiles: false
+
+    // Paradise palette
+    readonly property color bg: "#151515"
+    readonly property color fg: "#e8e3e3"
+    readonly property color muted: "#a39d9d"
+    readonly property color red: "#b66467"
+    readonly property color blue: "#8da3b9"
+    readonly property color border: "#424242"
+
+    component Label: Text {
+        font.family: "Maple Mono"
+        font.pointSize: 11
+        color: "#e8e3e3"
+    }
+
+    // Shared by every monitor, so they all show the same field whichever
+    // one has the keyboard.
+    property string input: ""
+    property bool failed: false
+
+    SystemClock {
+        id: clock
+        precision: SystemClock.Minutes
+    }
+
+    // No config set: PamContext uses /etc/pam.d/login.
+    PamContext {
+        id: pam
+        onPamMessage: {
+            if (responseRequired)
+                respond(root.input);
+        }
+        onCompleted: result => {
+            root.input = "";
+            if (result === PamResult.Success)
+                lock.locked = false;
+            else
+                root.failed = true;
+        }
+    }
+
+    WlSessionLock {
+        id: lock
+        locked: true
+        // secure goes false once Mango has released the screens.
+        onSecureChanged: {
+            if (!secure)
+                Qt.quit();
+        }
+
+        WlSessionLockSurface {
+            color: root.bg
+
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 12
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: Qt.formatDateTime(clock.date, "HH:mm")
+                    font.pointSize: 72
+                }
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.bottomMargin: 36
+                    text: Qt.formatDateTime(clock.date, "dddd d MMMM")
+                    color: root.muted
+                }
+                // Red after a wrong password, blue on the monitor that has
+                // the keyboard.
+                Rectangle {
+                    implicitWidth: 360
+                    implicitHeight: 36
+                    color: root.bg
+                    border.width: 2
+                    border.color: root.failed ? root.red
+                                : password.activeFocus ? root.blue : root.border
+
+                    TextInput {
+                        id: password
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        verticalAlignment: TextInput.AlignVCenter
+                        font.family: "Maple Mono"
+                        font.pointSize: 11
+                        color: root.fg
+                        echoMode: TextInput.Password
+                        readOnly: pam.active
+                        focus: true
+                        onTextChanged: {
+                            root.input = text;
+                            if (text !== "")
+                                root.failed = false;
+                        }
+                        onAccepted: {
+                            if (text !== "" && !pam.active)
+                                pam.start();
+                        }
+                        Keys.onEscapePressed: root.input = ""
+                        Connections {
+                            target: root
+                            function onInputChanged() {
+                                password.text = root.input;
+                            }
+                        }
+                    }
+                }
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: pam.active ? "Checking..."
+                        : root.failed ? "Wrong password"
+                        : "Enter to unlock, Escape to clear"
+                    color: root.failed && !pam.active ? root.red : root.muted
+                }
+            }
+        }
+    }
+
+    // `qs -p ~/.config/quickshell/lock.qml ipc call lock secure` prints true
+    // once Mango has confirmed every monitor is covered.
+    IpcHandler {
+        target: "lock"
+        function secure(): bool {
+            return lock.secure;
+        }
+    }
+}
+```
+
+- Both monitors fill in as you type, and the field on the monitor that has the keyboard gets a blue border. Enter checks the password and Escape clears it.
+- A wrong password empties the field and turns it red until you type again. PAM waits two seconds before it answers a wrong one, and the field shows "Checking..." meanwhile.
+- `PamContext` without a `config` uses `/etc/pam.d/login`, so there's no PAM file to write.
+- It doesn't go in `shell.qml` because Quickshell reloads a config every time you save it, and each reload builds a new `WlSessionLock`. If the new one starts unlocked, the screen unlocks. If it starts locked, Quickshell 0.3.2 crashes while taking over the old lock, and the session stays locked with nothing to type the password into. `settings.watchFiles: false` stops `lock.qml` from reloading, so edits to it apply from the next lock on. The bar still reloads on save.
+- The file is also [here](/files/mango-0.18/lock.qml) to download.
+
+A small script starts it. With `-n`, `qs` exits if that config is already running, so a second lock request does nothing. The loop then waits until Mango confirms every monitor is covered, and swayidle holds off suspend until the script returns:
+
+```sh title="~/dotfiles/bin/mango-lock"
+#!/bin/sh
+# Lock the screen and return once every monitor is covered, so swayidle -w
+# holds off suspend until then. -n: already locked, do nothing.
+lock="$HOME/.config/quickshell/lock.qml"
+qs -n -d -p "$lock" || exit 1
+for _ in $(seq 50); do
+	[ "$(qs -p "$lock" ipc call lock secure 2>/dev/null)" = true ] && exit 0
+	sleep 0.1
+done
+exit 1
+```
+
+swayidle runs from another script, so the autostart entry and the toggle key start exactly the same thing:
 
 ```sh title="~/dotfiles/bin/mango-idle"
 #!/bin/sh
 # lock after 10 minutes, monitors off after 15, lock before suspend
 exec swayidle -w \
-	timeout 600 'swaylock -f' \
+	timeout 600 /usr/local/bin/mango-lock \
 	timeout 900 "wlopm --off '*'" resume "wlopm --on '*'" \
-	before-sleep 'swaylock -f'
+	before-sleep /usr/local/bin/mango-lock
 ```
 
 ```bash
-sudo install -m 755 ~/dotfiles/bin/mango-idle /usr/local/bin/mango-idle
+sudo install -m 755 ~/dotfiles/bin/mango-idle ~/dotfiles/bin/mango-lock /usr/local/bin/
 ```
+
+Super+Escape locks the screen by hand. It's a `bindl`, so it works while locked too. If the lock process dies, Mango keeps the session locked behind a plain dark gray screen, and Super+Escape starts a new lock that takes over.
 
 `wlopm` turns the monitors off through the output power protocol, which Mango implements. Don't use Mango's `disable_monitor` for this on NVIDIA: turning a monitor back on that way can leave it black ([mango#1164](https://github.com/mangowm/mango/issues/1164)).
 
@@ -1121,7 +1292,7 @@ fc-cache -f
 fc-match "Maple Mono"
 ```
 
-The last command should print `MapleMono-Regular.ttf: "Maple Mono" "Regular"`. Quickshell, foot, wmenu and swaylock all find it by that name. In foot the cursive italic shows up, but the ligatures don't: `->` and `!=` stay as separate characters.
+The last command should print `MapleMono-Regular.ttf: "Maple Mono" "Regular"`. Quickshell, foot and wmenu all find it by that name. In foot the cursive italic shows up, but the ligatures don't: `->` and `!=` stay as separate characters.
 
 Maple Mono has no icon glyphs, and eza, Neovim's file tree and statusline use them. The symbols-only Nerd Font from Terra fills that gap: foot finds it through fontconfig and uses it for any character Maple Mono lacks, so there's no need for a patched copy of the font:
 
@@ -1272,21 +1443,6 @@ bright7=e8e3e3
 ```
 
 `foot --check-config` validates the file.
-
-```ini title="~/dotfiles/swaylock/.config/swaylock/config"
-color=151515
-inside-color=151515
-ring-color=424242
-line-color=151515
-separator-color=151515
-key-hl-color=8da3b9
-bs-hl-color=b66467
-ring-ver-color=d9bc8c
-ring-wrong-color=b66467
-text-color=e8e3e3
-indicator-radius=80
-font=Maple Mono
-```
 
 For zathura I use the [Paradise zathurarc](https://github.com/paradise-theme/paradise/blob/main/cfg/zathura/zathurarc) as it is, with the font line changed to `set font "Maple Mono 11"`.
 
