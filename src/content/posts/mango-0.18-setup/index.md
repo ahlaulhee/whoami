@@ -1312,7 +1312,7 @@ kew publishes what it's playing over MPRIS under the name `kew`, which is how th
 ```bash
 sudo dnf install foot wmenu swaybg libnotify swayidle wlopm firefox discord playerctl jq \
   wl-clipboard cliphist grim slurp grimpicker \
-  xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-user-dirs \
+  xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-user-dirs dconf \
   nnn zathura zathura-pdf-mupdf imv mpv neovim NetworkManager-tui xdg-utils gawk \
   google-noto-color-emoji-fonts
 xdg-user-dirs-update
@@ -1333,6 +1333,7 @@ sudo dnf install wl-clip-persist
 | `wmenu` | launcher; `wmenu-run` lists everything in `$PATH` |
 | `swaybg` | background |
 | `libnotify` | `notify-send`, to test the notifications |
+| `dconf` | stores what `gsettings` writes, like the dark mode below; without it the settings are lost at logout |
 | `playerctl` | play, pause and skip in kew or any other MPRIS player from a shell: `playerctl -p kew play-pause` |
 | `jq` | reads the JSON `mmsg` prints; `mango-tag` uses it to find the focused monitor |
 | `swayidle`, `wlopm` | lock screen after ten minutes idle, monitors off after fifteen |
@@ -1805,6 +1806,15 @@ bright7=e8e3e3
 `foot --check-config` validates the file.
 
 For zathura I use the [Paradise zathurarc](https://github.com/paradise-theme/paradise/blob/main/cfg/zathura/zathurarc) as it is, with the font line changed to `set font "Maple Mono 11"`.
+
+GTK and Qt programs don't get Paradise. Here that shows mostly in the file picker that Discord and Firefox open through `xdg-desktop-portal-gtk`, which is GTK3 and light by default. Two settings turn it dark, and the portal passes the same preference on to programs that ask for it, such as Firefox with its system theme and websites that follow `prefers-color-scheme`:
+
+```bash
+gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark
+```
+
+Run them once from a terminal inside Mango; `gsettings` keeps them in dconf, so they last across logins. The colors are GNOME's dark grays rather than Paradise, and the tray menus stay light, since they're Qt.
 
 ## Firefox
 
