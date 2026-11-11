@@ -128,3 +128,73 @@
 .prose .expressive-code {
   max-width: none;
 }
+
+/* below the two-column layout long code lines wrap (Expressive Code `wrap`); from there on they scroll */
+@media (min-width: 64em) {
+  .prose .expressive-code pre.wrap .ec-line .code {
+    white-space: pre;
+  }
+}
+
+@media (max-width: 40em) {
+  .prose {
+    line-height: 1.65;
+  }
+
+  .prose h2 {
+    margin-top: 2em;
+  }
+
+  /* code frames run to the panel edges, with their text on the same left edge as the prose */
+  .prose .expressive-code {
+    --ec-codePadInl: var(--pad);
+    margin-inline: calc(-1 * var(--pad));
+  }
+
+  .prose .expressive-code figure.frame > :is(.header, pre) {
+    border-inline-width: 0;
+  }
+
+  /* two-column tables (key → meaning) stack: each row becomes a block led by its first cell, split by
+     hairlines; wider tables keep their grid and scroll sideways */
+  .prose table:not(:has(th:nth-child(3))),
+  .prose table:not(:has(th:nth-child(3))) :is(tbody, tr, td) {
+    display: block;
+  }
+
+  .prose table:not(:has(th:nth-child(3))) {
+    overflow: visible;
+    font-size: inherit;
+    border-block: 1px solid var(--line);
+
+    & thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    & tr {
+      padding-block: 0.75rem;
+    }
+
+    & tr + tr {
+      border-top: 1px solid var(--line);
+    }
+
+    & td {
+      padding: 0;
+      border: 0;
+    }
+
+    & td:first-child {
+      font-weight: 600;
+    }
+
+    & td + td {
+      margin-top: 0.25rem;
+    }
+  }
+}

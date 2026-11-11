@@ -115,6 +115,13 @@ const rail = Astro.slots.has('rail') ? (await Astro.slots.render('rail')).trim()
     margin-inline: auto;
   }
 
+  /* phones: panels span the screen; header and footer keep the gutter, which matches the panel padding */
+  @media (max-width: 40em) {
+    .frame {
+      width: 100%;
+    }
+  }
+
   .site-header {
     display: flex;
     align-items: center;
@@ -221,5 +228,24 @@ const rail = Astro.slots.has('rail') ? (await Astro.slots.render('rail')).trim()
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
+  }
+
+  /* touch: ~40px hit areas without changing how the links look */
+  @media (pointer: coarse) {
+    nav a,
+    .site-footer a {
+      position: relative;
+    }
+
+    nav a::after,
+    .site-footer a::after {
+      content: '';
+      position: absolute;
+      inset: -0.375rem 0;
+    }
+
+    .site-footer a::after {
+      inset: -0.625rem -0.25rem;
+    }
   }
 </style>

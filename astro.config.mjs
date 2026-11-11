@@ -16,6 +16,8 @@ export default defineConfig({
     expressiveCode({
       themes: [paradise],
       useThemedScrollbars: false,
+      // long lines wrap with a hanging indent on narrow screens; from 64em prose.css turns wrapping off again
+      defaultProps: { wrap: true, hangingIndent: 2 },
       styleOverrides: {
         borderRadius: '0',
         borderColor: '#2b2b2b',

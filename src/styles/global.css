@@ -133,6 +133,17 @@ a:hover {
   padding: var(--pad);
 }
 
+/* phones: panels span the screen, keeping only their top and bottom hairlines */
+@media (max-width: 40em) {
+  :root {
+    --pad: 1rem;
+  }
+
+  .panel {
+    border-inline: 0;
+  }
+}
+
 .panel-title {
   display: flex;
   align-items: center;
@@ -175,6 +186,19 @@ a:hover {
 
 .tag:hover {
   color: var(--fg);
+}
+
+/* touch: a ~40px hit area around the small mono links, without changing how they look */
+@media (pointer: coarse) {
+  .tag {
+    position: relative;
+  }
+
+  .tag::after {
+    content: '';
+    position: absolute;
+    inset: -0.625rem -0.25rem;
+  }
 }
 
 /* post rows: divided list, never boxes inside the panel */
