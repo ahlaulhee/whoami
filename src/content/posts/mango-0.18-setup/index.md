@@ -5,7 +5,7 @@ description: Mango 0.18 with the scrolling layout on every tag, a Quickshell bar
 pubDate: 2026-11-08
 updatedDate: 2026-11-14
 tags: [mango, wayland, quickshell]
-testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, fish 4.6, yazi 26.9, akmod-nvidia 615.78, RTX 5070]
+testedOn: [Fedora 45, Mango 0.18.5, Quickshell 0.3.2, fish 4.6, yazi 26.9, akmod-nvidia 620.70, RTX 5070]
 series:
   name: Fedora 45 + Mango from scratch
   part: 2
@@ -2689,7 +2689,7 @@ chooser_cmd=wmenu -p 'Share:' -l 10 -f 'Maple Mono 14.5' -N 151515 -n a39d9d -M 
 
 Restart the portal after changing it: `systemctl --user restart xdg-desktop-portal-wlr`.
 
-Fedora 45 ships xdg-desktop-portal-wlr 0.8.4, which has two open regressions: the stream freezing after the first frame ([#411](https://github.com/emersion/xdg-desktop-portal-wlr/issues/411)) and sharing failing with "No supported targets specified" ([#409](https://github.com/emersion/xdg-desktop-portal-wlr/issues/409)). Both reports say 0.8.2 works. If you hit one, those issues are where fixes and workarounds show up.
+Fedora 45 ships xdg-desktop-portal-wlr 0.8.5. Version 0.8.4 brought two regressions whose reports are still open: the stream freezing after the first frame ([#411](https://github.com/emersion/xdg-desktop-portal-wlr/issues/411)), which its reporter still sees on 0.8.5, and sharing failing with "No supported targets specified" ([#409](https://github.com/emersion/xdg-desktop-portal-wlr/issues/409)). Both reports say 0.8.2 works. If you hit one, those issues are where fixes and workarounds show up.
 
 ## A font for the desktop
 

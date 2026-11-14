@@ -3,8 +3,9 @@ slug: fedora-45-setup
 title: Setting up Fedora 45 from a minimal install
 description: Fedora 45 Everything netinstall, dnf5 tweaks, RPM Fusion, codecs, firmware and the NVIDIA driver with Secure Boot left on.
 pubDate: 2026-11-08
+updatedDate: 2026-11-14
 tags: [fedora, nvidia]
-testedOn: [Fedora 45, kernel 7.2, akmod-nvidia 615.78, RTX 5070]
+testedOn: [Fedora 45, kernel 7.3, akmod-nvidia 620.70, RTX 5070]
 series:
   name: Fedora 45 + Mango from scratch
   part: 1
@@ -200,7 +201,7 @@ A BIOS update can wipe the keys you enroll in the next section. Run firmware upd
 
 This section installs the current driver branch, for the GTX 16 series, the RTX 20 series and later cards. Older cards need a legacy branch; the [RPM Fusion NVIDIA page](https://rpmfusion.org/Howto/NVIDIA) lists which one.
 
-The RTX 5070 is a Blackwell card, and NVIDIA only supports Blackwell with its open kernel modules ([NVIDIA README](https://download.nvidia.com/XFree86/Linux-x86_64/615.78.08/README/kernel_open.html)). RPM Fusion's `akmod-nvidia` already uses the open modules by default, so there is no extra package or option to set.
+The RTX 5070 is a Blackwell card, and NVIDIA only supports Blackwell with its open kernel modules ([NVIDIA README](https://download.nvidia.com/XFree86/Linux-x86_64/620.70.06/README/kernel_open.html)). RPM Fusion's `akmod-nvidia` already uses the open modules by default, so there is no extra package or option to set.
 
 `akmods` builds the kernel module on your machine, and rebuilds it every time a new kernel arrives. With Secure Boot on, the firmware refuses modules that aren't signed by a key it trusts, and you end up with a black screen or software rendering. So create a signing key and enroll it in the firmware first, then install the driver. From then on akmods signs every build automatically.
 
