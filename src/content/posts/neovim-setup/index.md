@@ -1,16 +1,17 @@
 ---
 slug: neovim-setup
 title: My Neovim config
-description: Neovim 0.12 on Fedora 45 with native LSP for .NET, TypeScript/React, Go, Lua and Python, blink.cmp, conform, nvim-lint, mini.nvim, neo-tree and vague.nvim, used inside tmux next to a coding agent.
+description: Neovim 0.12 on Fedora 45 with native LSP for .NET, TypeScript/React, Go, Lua and Python, blink.cmp, conform, nvim-lint, mini.nvim, neo-tree, the Paradise colorscheme and notes with obsidian.nvim, used inside tmux next to a coding agent.
 pubDate: 2026-11-08
-tags: [neovim, tmux, opencode]
-testedOn: [Fedora 45, Neovim 0.12.6, tmux 3.8, opencode 2.2.6, .NET SDK 10, Node.js 22, Go 1.27, Python 3.15]
+updatedDate: 2026-11-14
+tags: [neovim, tmux, omp]
+testedOn: [Fedora 45, Neovim 0.12.6, tmux 3.8, omp 18.18, .NET SDK 10, Node.js 22, Go 1.27, Python 3.15]
 series:
   name: Fedora 45 + Mango from scratch
   part: 3
 ---
 
-This is the editor I work in every day: Neovim 0.12 inside tmux, set up for .NET, TypeScript and React, Go, Lua and Python. It has what you'd expect from an IDE: language servers, completion with snippets, formatting on save, linting, a file tree, and a fuzzy picker for files and text.
+This is the editor I work in every day: Neovim 0.12 inside tmux, set up for .NET, TypeScript and React, Go, Lua and Python. It has what you'd expect from an IDE: language servers, completion with snippets, formatting on save, linting, a file tree, and a fuzzy picker for files and text. It's also where I keep my notes.
 
 It builds on the Fedora 45 and Mango setup from parts 1 and 2, but nothing here depends on Mango; any Fedora 45 machine with a terminal works.
 
@@ -55,7 +56,6 @@ The config is two Stow packages in the same `~/dotfiles` repository as the rest 
 │       │   ├── autocmds.lua
 │       │   └── lazy.lua
 │       └── plugins/
-│           ├── agent.lua
 │           ├── colorscheme.lua
 │           ├── completion.lua
 │           ├── diff.lua
@@ -65,6 +65,7 @@ The config is two Stow packages in the same `~/dotfiles` repository as the rest 
 │           ├── lint.lua
 │           ├── lsp.lua
 │           ├── mini.lua
+│           ├── notes.lua
 │           ├── tmux.lua
 │           └── treesitter.lua
 └── tmux/.config/tmux/tmux.conf
@@ -123,6 +124,7 @@ o.undofile = true
 o.ignorecase = true
 o.smartcase = true
 o.mouse = "a"
+o.spelllang = { "es", "en" } -- 'spell' itself stays off; <leader>ns turns it on per buffer
 
 -- Faster CursorHold and a short wait before mini.clue shows its hints
 o.updatetime = 250
@@ -184,6 +186,7 @@ map("n", "<leader>v", "<C-w>v", { desc = "Split vertically" })
 map("n", "<leader>h", "<C-w>s", { desc = "Split horizontally" })
 
 map("n", "<leader>q", vim.diagnostic.setloclist, { desc = "Diagnostics to loclist" })
+map("n", "<leader>ns", "<cmd>setlocal spell! spell?<CR>", { desc = "Toggle spellcheck" })
 ```
 
 `<C-s>` saves only in normal and visual mode; in insert mode it stays Neovim's default, which shows the signature of the function you're calling. `]d` and `[d` for diagnostics are built in since 0.10, so they're not here.
@@ -233,29 +236,36 @@ vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
   spec = { { import = "plugins" } },
-  install = { colorscheme = { "vague" } },
+  dev = { path = "~/dev", fallback = true }, -- `dev = true` specs: local checkout, else GitHub
+  install = { colorscheme = { "paradise", "vague" } },
   rocks = { enabled = false }, -- no plugin here needs luarocks
   change_detection = { notify = false },
 })
 ```
 
-`:Lazy` opens its window, `:Lazy update` updates everything and rewrites `lazy-lock.json`, and `:Lazy restore` goes back to the versions in the lockfile.
+`:Lazy` opens its window, `:Lazy update` updates everything and rewrites `lazy-lock.json`, and `:Lazy restore` goes back to the versions in the lockfile. `dev` is for plugins I work on: a spec marked `dev = true` loads from a folder of the same name in `~/dev` when there is one, and from GitHub when there isn't.
 
 ## Colorscheme
 
-[vague.nvim](https://github.com/vague-theme/vague.nvim) is a low-contrast dark theme. It loads before every other UI plugin so they pick up its colors:
+The colors are [paradise.nvim](https://github.com/ahlaulhee/paradise.nvim), my Neovim version of the Paradise palette the rest of the desktop uses. It loads before every other UI plugin so they pick up its colors:
 
 ```lua title="~/dotfiles/nvim/.config/nvim/lua/plugins/colorscheme.lua"
 return {
-  "vague-theme/vague.nvim",
-  lazy = false,
-  priority = 1000,
-  config = function()
-    require("vague").setup({})
-    vim.cmd.colorscheme("vague")
-  end,
+  {
+    "ahlaulhee/paradise.nvim",
+    dev = true, -- ~/dev/paradise.nvim when it exists, GitHub otherwise
+    lazy = false,
+    priority = 1000,
+    config = function()
+      vim.cmd.colorscheme("paradise")
+    end,
+  },
+  -- Fallback, not loaded at startup: `:colorscheme vague`
+  { "vague-theme/vague.nvim", lazy = true },
 }
 ```
+
+It's the one spec with `dev = true`, so on my machine it loads from `~/dev/paradise.nvim`, where I work on it, and anywhere else lazy.nvim clones it from GitHub. [vague.nvim](https://github.com/vague-theme/vague.nvim), the low-contrast theme I used before, stays installed without loading at startup; `:colorscheme vague` switches to it.
 
 ## Language servers
 
@@ -524,7 +534,7 @@ Treesitter parses each file into a syntax tree, which gives better highlighting 
 ```lua title="~/dotfiles/nvim/.config/nvim/lua/plugins/treesitter.lua"
 local parsers = {
   "c_sharp", "typescript", "tsx", "javascript", "go", "lua", "python",
-  "html", "css", "json", "yaml", "bash", "vim", "vimdoc", "query",
+  "html", "css", "astro", "json", "yaml", "bash", "vim", "vimdoc", "query",
   "markdown", "markdown_inline",
 }
 
@@ -576,7 +586,7 @@ return {
 }
 ```
 
-The parsers are compiled on your machine, which is what `tree-sitter-cli` and `gcc` are for. The old `ensure_installed` option is gone; `install()` replaces it and does nothing for parsers that are already there.
+The parsers are compiled on your machine, which is what `tree-sitter-cli` and `gcc` are for. The old `ensure_installed` option is gone; `install()` replaces it and does nothing for parsers that are already there. `astro` is in the list for the files of this site.
 
 [nvim-ts-autotag](https://github.com/windwp/nvim-ts-autotag) uses the tree to edit tags: typing `<div>` in an HTML, JSX or TSX file adds `</div>`, and renaming the opening tag renames the closing one as you type.
 
@@ -650,7 +660,7 @@ return {
       clues = {
         { mode = "n", keys = "<Leader>s", desc = "+Search" },
         { mode = "n", keys = "<Leader>g", desc = "+Git" },
-        { mode = { "n", "x" }, keys = "<Leader>a", desc = "+Agent (opencode)" },
+        { mode = "n", keys = "<Leader>n", desc = "+Notes" },
         { mode = { "n", "x" }, keys = "<Leader>d", desc = "+Diff review" },
         clue.gen_clues.square_brackets(),
         clue.gen_clues.builtin_completion(),
@@ -749,6 +759,13 @@ set -as terminal-features ",foot*:RGB:extkeys"
 set -s extended-keys on
 set -s extended-keys-format csi-u
 
+# Image previews (yazi): pass graphics escapes through to foot (only while
+# the pane is visible) and copy the outer terminal's TERM/TERM_PROGRAM into
+# the session environment when a session is created or attached.
+set -g allow-passthrough on
+set -ga update-environment TERM
+set -ga update-environment TERM_PROGRAM
+
 set -s escape-time 10   # don't delay <Esc> in Neovim
 set -g focus-events on  # forward FocusGained/FocusLost to Neovim ('autoread' checks)
 set -g mouse on
@@ -773,9 +790,16 @@ bind % split-window -h -c "#{pane_current_path}"
 bind '"' split-window -v -c "#{pane_current_path}"
 bind c new-window -c "#{pane_current_path}"
 
-# prefix o: opencode in a split to the right, in the current pane's directory
+# prefix o: omp in a split to the right, in the current pane's directory
 # (replaces the default "next pane"; C-h/j/k/l already move between panes).
-bind o split-window -h -c "#{pane_current_path}" opencode
+bind o split-window -h -c "#{pane_current_path}" omp
+
+# prefix y: yazi in a split to the right, in the current pane's directory.
+bind y split-window -h -c "#{pane_current_path}" yazi
+
+# prefix n: the notes inbox in a popup, cursor on the last open task
+# (replaces the default "next window"; prefix p and prefix <number> remain).
+bind n display-popup -E -w 80% -h 80% -d ~/notes "nvim +NotesInbox"
 
 bind r source-file ~/.config/tmux/tmux.conf \; display "tmux.conf reloaded"
 
@@ -817,7 +841,7 @@ setw -g mode-style "bg=#424242,fg=#e8e3e3"
 A few of these settings exist only for Neovim:
 
 - `escape-time 10`: by default tmux waits half a second after `<Esc>` to see whether it starts a key sequence, which makes leaving insert mode feel slow.
-- `RGB` in `terminal-features` passes 24-bit color through, so vague.nvim looks the same inside tmux as outside. `focus-events` lets Neovim notice when you switch back to it, to reload files changed outside.
+- `RGB` in `terminal-features` passes 24-bit color through, so the colorscheme looks the same inside tmux as outside. `focus-events` lets Neovim notice when you switch back to it, to reload files changed outside.
 - `extended-keys` keeps `<Tab>` and `<C-i>` apart. Without it they reach Neovim as the same key.
 - The `is_vim` block is the tmux half of [vim-tmux-navigator](https://github.com/christoomey/vim-tmux-navigator): it checks whether the current pane is running Neovim and either passes `C-h/j/k/l` to it or moves to the neighbouring pane.
 
@@ -846,74 +870,30 @@ return {
 
 So `C-h/j/k/l` moves between Neovim splits and tmux panes as if they were one grid, and `C-a v` / `C-a h` split the tmux window the same way `<leader>v` / `<leader>h` split Neovim. `C-a d` detaches; `tmux attach` brings the session back with everything still running.
 
+Three binds open a program next to the editor. `C-a o` starts the coding agent in a split to the right and `C-a y` does the same with yazi, the file manager from part 2, both in the directory of the current pane. `C-a n` opens the [notes](#notes) inbox in a popup over the window, from any session. yazi draws image previews with escape sequences that tmux only lets through with `allow-passthrough` on, and the two `update-environment` lines copy foot's `TERM` and `TERM_PROGRAM` into the session, which is how yazi knows what terminal is outside tmux.
+
 ## Working with a coding agent
 
-Most days a coding agent runs in a tmux pane next to Neovim. It edits files in the project; I read what it changed, keep the parts I want and throw away the rest, and send it more context from the editor. Two plugins make that comfortable: [codediff.nvim](https://github.com/esmuellert/codediff.nvim) for reviewing changes, which works with any agent because it only reads git, and [opencode.nvim](https://github.com/nickjvandyke/opencode.nvim) for talking to [opencode](https://opencode.ai/) from Neovim.
+Most days a coding agent runs in a tmux pane next to Neovim. It edits files in the project; I read what it changed, keep the parts I want and throw away the rest. The agent is [omp](https://github.com/can1357/oh-my-pi). The only plugin involved is [codediff.nvim](https://github.com/esmuellert/codediff.nvim), for reviewing changes, and it works with any agent because it only reads git.
 
-### opencode
+### omp
 
-Terra has two opencode packages that both install `/usr/bin/opencode`: `opencode` is the older 1.x line, and `opencode-cli` is version 2, which opencode.nvim needs:
+omp is a single binary that its installer puts in `~/.local/bin`:
 
 ```bash
-sudo dnf install opencode-cli
+curl -fsSL https://omp.sh/install | sh
 ```
 
-`prefix o` in the tmux config above opens it in a split to the right, in the current directory. Pick a model and sign in to a provider inside opencode the first time; which one is up to you. The opencode TUI needs one message in the project before Neovim can send anything to it, because the plugin attaches to an existing session.
+`prefix o` in the tmux config above opens it in a split to the right, in the current directory. Sign in to a model provider the first time; which one is up to you.
 
-All opencode 2 clients share one background service per user, which writes its address to `~/.local/state/opencode/service.json`. opencode.nvim reads that file, so it finds the opencode running in the other pane without a port or any configuration:
+omp reads themes from `~/.omp/agent/themes`. [paradise.json](/files/neovim/paradise.json) gives it the palette of the rest of the desktop. Save it as `~/dotfiles/omp/.omp/agent/themes/paradise.json`, link the package and select the theme:
 
-```lua title="~/dotfiles/nvim/.config/nvim/lua/plugins/agent.lua"
-local function oc(fn, ...)
-  local args = { ... }
-  return function()
-    return require("opencode")[fn](unpack(args))
-  end
-end
-
-local nx = { "n", "x" }
-
-return {
-  "nickjvandyke/opencode.nvim",
-  -- main branch targets opencode 2; pinned by lazy-lock.json.
-  keys = {
-    { "<leader>aa", oc("ask", "@this: "), mode = nx, desc = "Ask about @this (cursor/selection)" },
-    { "<leader>ab", oc("ask", "@buffer: "), desc = "Ask about @buffer" },
-    { "<leader>ad", oc("ask", "@diagnostics: "), mode = nx, desc = "Ask about @diagnostics" },
-    { "<leader>as", oc("select"), mode = nx, desc = "Select prompt/command" },
-    -- Operator: <leader>ao{motion} (or a visual selection) appends the range to
-    -- opencode's prompt without asking; dot-repeatable.
-    { "<leader>ao", oc("operator", "@this"), mode = nx, expr = true, desc = "Send range (motion)" },
-    {
-      "<leader>al",
-      function()
-        return require("opencode").operator("@this") .. "_"
-      end,
-      expr = true,
-      desc = "Send line",
-    },
-  },
-  init = function()
-    ---@type opencode.Opts
-    vim.g.opencode_opts = {
-      server = {
-        -- Called when no opencode is running: open it in a tmux split next to
-        -- Neovim (focus stays here), the same as tmux prefix o.
-        start = function()
-          if vim.env.TMUX then
-            vim.system({ "tmux", "split-window", "-h", "-d", "-c", vim.fn.getcwd(), "opencode" })
-          else
-            vim.cmd("vsplit term://opencode | wincmd p")
-          end
-        end,
-      },
-    }
-  end,
-}
+```bash
+stow --no-folding -d ~/dotfiles -t ~ omp
+omp config set theme.dark paradise
 ```
 
-`<leader>aa` asks a question about the code under the cursor or the selection: the prompt starts with a reference like `src/app.ts:L12-L20` that opencode resolves to the code. `<leader>ab` does the same for the whole buffer, `<leader>ad` for the diagnostics, and `<leader>ao` adds a range to opencode's prompt without asking anything yet, so you can collect several pieces before writing the question. When opencode wants to edit a file, the plugin shows the proposed change as a diff in Neovim; `da` accepts it and `dr` rejects it. Files opencode changes reload by themselves, and the `checktime` autocmd above does the same for any other agent.
-
-opencode.nvim can use snacks.nvim for nicer input boxes, but doesn't need it: without snacks it asks through Neovim's own input and picks through `vim.ui.select`, which mini.pick provides.
+Files the agent changes reload in Neovim by themselves. `autoread` in the options makes Neovim reload a file that changed on disk while its buffer has no unsaved edits, tmux's `focus-events` tells Neovim when you come back to its pane, and the `checktime` autocmd above also checks while Neovim keeps the focus.
 
 ### Reviewing changes with codediff
 
@@ -956,7 +936,175 @@ My review loop after the agent says it's done:
 3. `<leader>gs` stages a hunk I want to keep and `<leader>gr` discards one I don't; `-` stages a whole file and `X` discards it.
 4. `q` closes the tab, and I commit what's staged or ask the agent to redo the rest.
 
-`<leader>dh` shows the history of the current file, or of the selected lines in visual mode, which is the quickest way to see when and why a block changed. All of this reads git only, so it works the same with omp, Claude Code or any other agent running in the other pane.
+`<leader>dh` shows the history of the current file, or of the selected lines in visual mode, which is the quickest way to see when and why a block changed. All of this reads git only, so it works the same with Claude Code, opencode or any other agent running in the other pane.
+
+## Notes
+
+My notes are Markdown files in `~/notes`, a private git repository. [obsidian.nvim](https://github.com/obsidian-nvim/obsidian.nvim) gives Neovim what the Obsidian app does with a folder like that: links between notes, backlinks, daily notes, templates and checkboxes. The app itself doesn't have to be installed.
+
+```txt
+~/notes
+├── inbox.md        # quick captures and tasks
+├── daily/          # one note per day
+├── reference/      # everything else
+├── projects/       # one note per project
+├── templates/      # daily.md, note.md, project.md
+└── attachments/
+```
+
+The plugin doesn't create the folder. The three templates are one line each, a heading with the note's title:
+
+```bash
+mkdir -p ~/notes/{daily,reference,projects,templates,attachments}
+cd ~/notes
+git init
+touch inbox.md
+echo '# {{title}}' | tee templates/daily.md templates/note.md templates/project.md
+```
+
+```lua title="~/dotfiles/nvim/.config/nvim/lua/plugins/notes.lua"
+-- Notes in ~/notes (a private git repo): inbox.md for quick captures and
+-- TODOs, daily/, reference/, projects/, templates/ and attachments/.
+local vault = vim.fn.expand("~/notes")
+
+-- The inbox with the cursor on its last open task, ready for `o`. Finished
+-- tasks sit below "## Done". Also what tmux's `prefix n` popup runs.
+local function open_inbox()
+  vim.cmd.edit(vault .. "/inbox.md")
+  local done = vim.fn.search("^## Done$", "nw")
+  local last = done > 0 and done - 1 or vim.fn.line("$")
+  vim.api.nvim_win_set_cursor(0, { math.max(vim.fn.prevnonblank(last), 1), 0 })
+end
+
+-- `:Obsidian new_from_template` takes the title and the template together or
+-- asks for both; this asks for the title alone.
+local function new_project()
+  vim.ui.input({ prompt = "Project: " }, function(title)
+    if title and title ~= "" then
+      vim.cmd.Obsidian({ args = { "new_from_template", title, "project" } })
+    end
+  end)
+end
+
+return {
+  "obsidian-nvim/obsidian.nvim",
+  version = "*",
+  ft = "markdown",
+  cmd = "Obsidian",
+  keys = {
+    { "<leader>ni", "<cmd>NotesInbox<CR>", desc = "Inbox" },
+    { "<leader>nd", "<cmd>Obsidian today<CR>", desc = "Today's daily note" },
+    { "<leader>nD", "<cmd>Obsidian dailies<CR>", desc = "Daily notes" },
+    { "<leader>nn", "<cmd>Obsidian new<CR>", desc = "New reference note" },
+    { "<leader>np", new_project, desc = "New project note" },
+    { "<leader>nf", "<cmd>Obsidian quick_switch<CR>", desc = "Find note" },
+    { "<leader>ng", "<cmd>Obsidian search<CR>", desc = "Grep notes" },
+    { "<leader>nt", "<cmd>Obsidian tags<CR>", desc = "Notes by tag" },
+  },
+  init = function()
+    vim.api.nvim_create_user_command("NotesInbox", open_inbox, { desc = "Open the notes inbox" })
+
+    local group = vim.api.nvim_create_augroup("notes", { clear = true })
+
+    -- obsidian.nvim's rendering (checkbox icons, hidden link syntax) needs
+    -- 'conceallevel'. Defined before the plugin loads, so it runs before the
+    -- plugin's own BufEnter check and no other file gets the option.
+    vim.api.nvim_create_autocmd("BufEnter", {
+      group = group,
+      pattern = vault .. "/*.md",
+      callback = function()
+        vim.wo[0][0].conceallevel = 2
+      end,
+    })
+
+    vim.api.nvim_create_autocmd("User", {
+      group = group,
+      pattern = "ObsidianNoteEnter",
+      callback = function()
+        local function map(lhs, rhs, desc, expr)
+          vim.keymap.set("n", lhs, rhs, { buffer = true, desc = desc, expr = expr })
+        end
+        map("<leader>nb", "<cmd>Obsidian backlinks<CR>", "Backlinks")
+        map("<leader>nT", "<cmd>Obsidian template<CR>", "Insert template")
+
+        -- The plugin's own defaults, set again here because the keymaps
+        -- cheatsheet (~/.local/bin/keymaps) only lists what this config sets.
+        local actions = require("obsidian.actions")
+        map("<CR>", actions.smart_action, "Follow link / toggle checkbox", true)
+        map("]o", function()
+          actions.nav_link("next", true)
+        end, "Next link")
+        map("[o", function()
+          actions.nav_link("prev", true)
+        end, "Previous link")
+      end,
+    })
+  end,
+  opts = function()
+    local p = require("paradise.palette")
+    return {
+      legacy_commands = false,
+      workspaces = { { name = "notes", path = vault } },
+      picker = { name = "mini.pick" },
+
+      -- New notes, and the ones made by following a link to a note that
+      -- doesn't exist, go to reference/ as <slug of the title>.md.
+      notes_subdir = "reference",
+      new_notes_location = "notes_subdir",
+      note_id_func = require("obsidian.builtin").title_id,
+      note = { template = "note.md" },
+
+      templates = {
+        folder = "templates",
+        customizations = {
+          project = { notes_subdir = "projects" },
+        },
+      },
+      daily_notes = {
+        folder = "daily",
+        template = "daily.md",
+        default_tags = { "daily" },
+      },
+
+      frontmatter = {
+        -- inbox.md stays a plain list.
+        enabled = function(path)
+          return tostring(path) ~= "inbox.md"
+        end,
+      },
+      checkbox = { order = { " ", "x" } },
+
+      ui = {
+        hl_groups = {
+          ObsidianTodo = { bold = true, fg = p.yellow },
+          ObsidianDone = { bold = true, fg = p.green },
+          ObsidianRightArrow = { bold = true, fg = p.blue },
+          ObsidianTilde = { bold = true, fg = p.muted },
+          ObsidianImportant = { bold = true, fg = p.red },
+          ObsidianBullet = { bold = true, fg = p.blue },
+          ObsidianRefText = { underline = true, fg = p.magenta },
+          ObsidianExtLinkIcon = { fg = p.magenta },
+          ObsidianTag = { italic = true, fg = p.cyan },
+          ObsidianBlockID = { italic = true, fg = p.cyan },
+          ObsidianHighlightText = { fg = p.bg, bg = p.yellow },
+        },
+      },
+    }
+  end,
+}
+```
+
+The inbox is one file for quick captures and tasks, as a list of checkboxes. `<leader>ni` opens it with the cursor on the last open task, ready for `o` to add one below. Finished tasks go under a `## Done` heading at the end. `:NotesInbox` does the same as a command, and the tmux popup behind `C-a n` runs it, so writing something down takes one key from any window and closing Neovim returns to what was there.
+
+New notes go to `reference/`, named after their title: `<leader>nn` asks for one, and following a link to a note that doesn't exist creates it. `<leader>np` asks for a title and makes the note in `projects/`. `<leader>nd` opens today's note in `daily/`, creating it on the first use of the day. Every note gets a frontmatter block with its id, aliases and tags, except `inbox.md`, which stays a plain list.
+
+Finding a note goes through mini.pick: `<leader>nf` by name, `<leader>ng` by content and `<leader>nt` by tag.
+
+Inside a note, Enter follows the link under the cursor or toggles a checkbox, `]o` and `[o` jump between links, `<leader>nb` lists the notes that link to this one and `<leader>nT` inserts a template. Enter and the two jumps are the plugin's own defaults, set again here so that part 2's keymap cheatsheet, which only lists what the config sets, shows them.
+
+The plugin draws checkboxes as icons and hides the brackets of a link, which needs `conceallevel` at 2. The `BufEnter` autocmd sets it only for files in `~/notes`, so Markdown anywhere else shows as it's written. The colors of those icons come from paradise.nvim's palette, so `opts` is a function: it runs when the plugin loads, after the colorscheme.
+
+`spelllang` in the options names Spanish and English, and `<leader>ns` turns spell checking on or off for the current buffer. The first time, Neovim offers to download the Spanish dictionary.
 
 ## First start
 
@@ -995,8 +1143,11 @@ Leader is Space. Besides the editor keymaps at the top:
 | `<leader>gs` / `gr` / `gp` / `gb` | stage, reset, preview hunk; blame line |
 | `C-h/j/k/l` | move between splits and tmux panes |
 | `<C-y>`, `<C-n>`/`<C-p>`, `<C-space>` | accept, select, open completion |
-| `<leader>aa` / `ab` / `ad` | ask opencode about the cursor or selection / the buffer / the diagnostics |
-| `<leader>ao{motion}`, `<leader>al` | add a range / the current line to opencode's prompt |
-| `<leader>as` | pick an opencode prompt or command |
+| `<leader>ni` | notes inbox |
+| `<leader>nd` / `nD` | today's daily note / the list of daily notes |
+| `<leader>nn` / `np` | new reference note / new project note |
+| `<leader>nf` / `ng` / `nt` | find a note by name / by content / by tag |
+| `<leader>nb` / `nT` | backlinks / insert a template, inside a note |
+| `<leader>ns` | spell checking on or off |
 | `<leader>dd` / `ds` / `df` | review working tree / staged changes / current file vs HEAD |
 | `<leader>dh` / `dH` | history of the file (or selected lines) / the repo |
