@@ -232,6 +232,17 @@ menuitem:where([_moz-menuactive]:not([disabled])) {
   color: var(--pd-fg) !important;
 }
 
+/* Suggestions under a page's input (form history, logins): the list takes
+ * its text colour, FieldText, from the page's colour scheme, which is dark
+ * text on a light page, over the panel background set above. */
+panel[type="autocomplete-richlistbox"] .autocomplete-richlistbox {
+  color: var(--pd-fg) !important;
+}
+.autocomplete-richlistitem[selected] {
+  background-color: var(--pd-line) !important;
+  color: var(--pd-fg) !important;
+}
+
 /* App menu: the sign-in promo and the purple-to-orange separator under it. */
 panel {
   --panel-separator-zap-gradient: none !important;

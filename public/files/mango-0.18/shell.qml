@@ -1,4 +1,7 @@
 //@ pragma UseQApplication
+// The tray menus are native Qt menus. This platform theme makes Qt follow
+// the system's dark preference instead of its light default palette.
+//@ pragma Env QT_QPA_PLATFORMTHEME = xdgdesktopportal
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
@@ -21,12 +24,67 @@ ShellRoot {
     readonly property color blue: "#8da3b9"
     readonly property color red: "#b66467"
     readonly property color border: "#424242"
+    readonly property color surface: "#2a2a2a"
 
     // Text in the bar font. Colors default to fg; callers override.
     component Label: Text {
         font.family: "Maple Mono"
         font.pointSize: 11
         color: "#e8e3e3"
+    }
+
+    // A bar module: a block 22 px tall around a row of items, with 10 px of
+    // padding on each side. A click, right click or wheel turn anywhere on
+    // it emits clicked, rightClicked or scrolled (with the wheel delta);
+    // items with their own MouseArea take their clicks first.
+    component Block: Rectangle {
+        id: block
+        default property alias content: row.data
+        signal clicked
+        signal rightClicked
+        signal scrolled(real delta)
+        implicitWidth: row.implicitWidth + 20
+        implicitHeight: 22
+        color: "#2a2a2a"
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: mouse => mouse.button === Qt.RightButton
+                                ? block.rightClicked() : block.clicked()
+            onWheel: wheel => block.scrolled(wheel.angleDelta.y)
+        }
+        RowLayout {
+            id: row
+            anchors.centerIn: parent
+            spacing: 8
+        }
+    }
+
+    // Media control: a Symbols Nerd Font glyph whose click area reaches 4 px
+    // past it on every side. Dimmed and inert while the player can't do the
+    // action.
+    component MediaButton: Item {
+        id: button
+        required property string glyph
+        property bool available: true
+        signal clicked
+        implicitWidth: 16
+        implicitHeight: 22
+
+        Text {
+            anchors.centerIn: parent
+            text: button.glyph
+            font.family: "Symbols Nerd Font"
+            font.pixelSize: 16
+            color: button.available ? "#e8e3e3" : "#424242"
+        }
+        MouseArea {
+            anchors.fill: parent
+            anchors.margins: -4
+            enabled: button.available
+            onClicked: button.clicked()
+        }
     }
 
     // A long-running `mmsg watch ...` that emits one parsed JSON object per
@@ -70,12 +128,9 @@ ShellRoot {
         }
     }
 
-    // Focused window title (null title when nothing has focus).
-    property string windowTitle: ""
-    MmsgWatch {
-        command: ["mmsg", "watch", "focusing-client"]
-        onMessage: c => root.windowTitle = c.title ?? ""
-    }
+    // The clock shows the time; a click on it switches every bar to the
+    // date, and back.
+    property bool clockShowsDate: false
 
     // Active keyboard layout. Mango reports the XKB name ("English (US)");
     // the bar shows the short code, or the full name for a layout not listed.
@@ -124,34 +179,82 @@ ShellRoot {
         }
     }
 
-    // kew's built-in MPRIS server; any other MPRIS player is ignored.
-    readonly property MprisPlayer music: Mpris.players.values
-        .find(p => p.identity === "kew") ?? null
+    // The music players the bar follows, by MPRIS identity; any other MPRIS
+    // player (a browser tab, a video) is ignored.
+    readonly property var musicPlayers: Mpris.players.values
+        .filter(p => p.identity === "kew" || p.identity === "Spotify")
+    // The one the bar shows and controls: the last one that was playing. It
+    // changes only when another one is playing and this one isn't, or when
+    // this one quits. musicPlaying changes with the players and with what
+    // each one is doing, which is when the choice is made again.
+    property MprisPlayer music: null
+    readonly property var musicPlaying: musicPlayers.map(p => p.isPlaying)
+    onMusicPlayingChanged: {
+        const current = musicPlayers.includes(music) ? music : null;
+        if (!current?.isPlaying)
+            music = musicPlayers.find(p => p.isPlaying) ?? current ?? musicPlayers[0] ?? null;
+    }
 
-    // Volume widget for a PipeWire node: click mutes, wheel changes by 5 %,
-    // right click emits rightClicked (the output list for "vol").
-    component Volume: Label {
+    // Seconds as m:ss, for the track's position and length.
+    function trackTime(seconds: real): string {
+        const s = Math.max(0, Math.floor(seconds));
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    }
+
+    // Audio spectrum for the bar's visualizer. cava listens to everything
+    // the default output plays and prints one line per frame, 30 a second:
+    // one level from 0 to 100 per band, each followed by ";". If it exits,
+    // retry after 1 s.
+    readonly property int spectrumBands: 12
+    property var spectrum: []
+    Process {
+        id: cava
+        running: true
+        command: ["sh", "-c", "exec cava -p /dev/stdin <<EOF\n" + [
+            "[general]",
+            "framerate = 30",
+            `bars = ${root.spectrumBands}`,
+            "[output]",
+            "method = raw",
+            "raw_target = /dev/stdout",
+            "data_format = ascii",
+            "ascii_max_range = 100",
+            "bar_delimiter = 59",
+            "frame_delimiter = 10",
+            "channels = mono"
+        ].join("\n") + "\nEOF"]
+        stdout: SplitParser {
+            onRead: line => root.spectrum = line.split(";", root.spectrumBands).map(Number)
+        }
+        onExited: cavaRetry.start()
+    }
+    Timer {
+        id: cavaRetry
+        interval: 1000
+        onTriggered: cava.running = true
+    }
+
+    // Volume block for a PipeWire node: click mutes, wheel changes by 5 %,
+    // right click is left to the caller (the output list for "vol").
+    component Volume: Block {
         id: vol
         required property string label
         property PwNode node
         readonly property PwNodeAudio audio: node?.audio ?? null
-        signal rightClicked
         visible: audio !== null
-        text: audio ? `${label} ${Math.round(audio.volume * 100)}%` : ""
-        color: audio?.muted ? "#a39d9d" : "#e8e3e3"
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onClicked: mouse => {
-                if (mouse.button === Qt.RightButton)
-                    vol.rightClicked();
-                else
-                    vol.audio.muted = !vol.audio.muted;
-            }
-            onWheel: wheel => {
-                const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
-                vol.audio.volume = Math.max(0, Math.min(1, vol.audio.volume + step));
-            }
+        onClicked: vol.audio.muted = !vol.audio.muted
+        onScrolled: delta => {
+            const step = delta > 0 ? 0.05 : -0.05;
+            vol.audio.volume = Math.max(0, Math.min(1, vol.audio.volume + step));
+        }
+
+        Label {
+            text: vol.label
+            color: "#a39d9d"
+        }
+        Label {
+            text: vol.audio ? `${Math.round(vol.audio.volume * 100)}%` : ""
+            color: vol.audio?.muted ? "#a39d9d" : "#e8e3e3"
         }
     }
 
@@ -174,28 +277,38 @@ ShellRoot {
         }
     }
 
-    // Volume OSD: 1.5 s after the output's volume, mute or the output itself
-    // changes. Changes during the first sync with PipeWire don't count.
+    // Volume OSD: 1.5 s after the volume or mute of the default output or
+    // microphone changes, or the default device itself changes. It shows the
+    // node that changed last. Changes during the first sync with PipeWire
+    // don't count.
     property bool osdVisible: false
+    property PwNode osdNode: null
     Timer {
         id: osdTimer
         interval: 1500
         onTriggered: root.osdVisible = false
     }
-    function showOsd(): void {
-        if (!Pipewire.ready || !Pipewire.defaultAudioSink?.ready)
+    function showOsd(node: PwNode): void {
+        if (!Pipewire.ready || !node?.ready)
             return;
+        root.osdNode = node;
         root.osdVisible = true;
         osdTimer.restart();
     }
     Connections {
         target: Pipewire.defaultAudioSink?.audio ?? null
-        function onVolumeChanged() { root.showOsd(); }
-        function onMutedChanged() { root.showOsd(); }
+        function onVolumeChanged() { root.showOsd(Pipewire.defaultAudioSink); }
+        function onMutedChanged() { root.showOsd(Pipewire.defaultAudioSink); }
+    }
+    Connections {
+        target: Pipewire.defaultAudioSource?.audio ?? null
+        function onVolumeChanged() { root.showOsd(Pipewire.defaultAudioSource); }
+        function onMutedChanged() { root.showOsd(Pipewire.defaultAudioSource); }
     }
     Connections {
         target: Pipewire
-        function onDefaultAudioSinkChanged() { root.showOsd(); }
+        function onDefaultAudioSinkChanged() { root.showOsd(Pipewire.defaultAudioSink); }
+        function onDefaultAudioSourceChanged() { root.showOsd(Pipewire.defaultAudioSource); }
     }
 
     // LazyLoader creates the window each time it's shown. A layer surface
@@ -205,13 +318,13 @@ ShellRoot {
 
         PanelWindow {
             id: osd
-            readonly property PwNode sink: Pipewire.defaultAudioSink
-            readonly property real volume: sink?.audio?.volume ?? 0
-            readonly property bool muted: sink?.audio?.muted ?? false
+            readonly property PwNode node: root.osdNode
+            readonly property real volume: node?.audio?.volume ?? 0
+            readonly property bool muted: node?.audio?.muted ?? false
             anchors.bottom: true
             margins.bottom: 120
             exclusiveZone: 0
-            implicitWidth: 360
+            implicitWidth: 420
             implicitHeight: 48
             color: root.border
             WlrLayershell.layer: WlrLayer.Overlay
@@ -228,8 +341,13 @@ ShellRoot {
                     anchors.margins: 12
                     spacing: 12
 
+                    // "vol" or "mic", as in the bar.
                     Label {
-                        text: osd.sink?.description || osd.sink?.name || ""
+                        text: osd.node?.isSink ? "vol" : "mic"
+                        color: root.muted
+                    }
+                    Label {
+                        text: osd.node?.description || osd.node?.name || ""
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
@@ -493,6 +611,14 @@ ShellRoot {
         }
     }
 
+    // Keymap cheatsheet (Keymaps.qml): `qs ipc call keymaps toggle` shows or
+    // hides it (Super+Shift+/).
+    Keymaps {}
+
+    // Menu (Menu.qml): `qs ipc call menu run` lists the programs in $PATH
+    // (Super+p), `qs ipc call menu clipboard` the clipboard history (Super+v).
+    Menu {}
+
     // One bar per monitor.
     Variants {
         model: Quickshell.screens
@@ -503,6 +629,12 @@ ShellRoot {
             screen: modelData
             visible: root.barVisible
 
+            // The main monitor (DP-2, or the first one while DP-2 isn't
+            // connected) gets the complete bar; the others leave out the
+            // music player and the tray.
+            readonly property bool full: modelData.name ===
+                (Quickshell.screens.find(s => s.name === "DP-2") ?? Quickshell.screens[0]).name
+
             // Docked to the top edge, full width. The default exclusionMode
             // (Auto) reserves an exclusive zone as tall as the bar.
             anchors {
@@ -510,7 +642,7 @@ ShellRoot {
                 left: true
                 right: true
             }
-            implicitHeight: 28
+            implicitHeight: 30
             color: root.bg
 
             // Tags of this output: [{index, is_active, is_urgent, client_count, ...}]
@@ -520,71 +652,271 @@ ShellRoot {
                 onMessage: m => bar.tags = m.tags
             }
 
-            // Left: active and occupied tags; click views the tag on this output.
-            Row {
+            // Opens a popup of this bar, or closes it when it's open. The
+            // other ones close first: a popup opened while another one holds
+            // the pointer becomes its child and lands in the wrong place.
+            function togglePopup(popup: PopupWindow): void {
+                for (const other of [outputs, history, panel]) {
+                    if (other !== popup)
+                        other.visible = false;
+                }
+                popup.visible = !popup.visible;
+            }
+
+            // Left: the tags, then, on the main monitor, the visualizer.
+            RowLayout {
                 id: left
                 anchors.left: parent.left
-                height: parent.height
+                anchors.leftMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
 
-                Repeater {
-                    model: bar.tags
+                // One mark per tag, in order: wide for the active one, red
+                // for an urgent one, dim for an empty one. A click views the
+                // tag on this output.
+                Block {
+                    visible: bar.tags.length > 0
 
-                    Rectangle {
-                        id: tag
-                        required property var modelData
-                        visible: modelData.is_active || modelData.client_count > 0
-                        width: 28
-                        height: bar.height
-                        color: modelData.is_urgent ? root.red
-                             : modelData.is_active ? root.fg : root.bg
+                    Repeater {
+                        model: bar.tags
 
-                        Label {
-                            anchors.centerIn: parent
-                            text: tag.modelData.index
-                            color: tag.modelData.is_active || tag.modelData.is_urgent
-                                   ? root.bg : root.muted
+                        Item {
+                            id: tag
+                            required property var modelData
+                            implicitWidth: modelData.is_active ? 18 : 7
+                            implicitHeight: 22
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.width
+                                height: 7
+                                color: tag.modelData.is_urgent ? root.red
+                                     : tag.modelData.is_active ? root.fg
+                                     : tag.modelData.client_count > 0 ? root.muted : root.border
+                            }
+                            // Reaches into the gaps so the marks are easy to hit.
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                onClicked: Quickshell.execDetached(["mmsg", "dispatch",
+                                    `viewcrossmon,${tag.modelData.index},${bar.modelData.name}`])
+                            }
                         }
-                        MouseArea {
+                    }
+                }
+
+                // Visualizer: one bar per band of the spectrum, 2 to 14 px
+                // tall. While a music player is open, a click opens its
+                // panel.
+                Block {
+                    id: music
+                    readonly property MprisPlayer player: root.music
+                    visible: bar.full
+                    onClicked: {
+                        if (player)
+                            bar.togglePopup(panel);
+                    }
+
+                    Row {
+                        spacing: 2
+
+                        Repeater {
+                            model: root.spectrumBands
+
+                            Item {
+                                id: band
+                                required property int index
+                                width: 4
+                                height: 14
+
+                                Rectangle {
+                                    anchors.bottom: parent.bottom
+                                    width: parent.width
+                                    height: Math.max(2, Math.round((root.spectrum[band.index] ?? 0) * 0.14))
+                                    color: root.fg
+                                }
+                            }
+                        }
+                    }
+
+                    // The player's panel: cover, track, controls and
+                    // timeline. A click anywhere else closes it.
+                    PopupWindow {
+                        id: panel
+                        readonly property MprisPlayer player: music.player
+                        onPlayerChanged: {
+                            if (!player)
+                                visible = false;
+                        }
+                        // Just below the bar, left edge under the block.
+                        anchor.item: music
+                        anchor.rect.y: bar.height - left.y - music.y
+                        grabFocus: true
+                        implicitWidth: 380
+                        implicitHeight: sheet.implicitHeight + 28
+                        color: root.border
+
+                        // A player doesn't announce its position as it
+                        // advances; read it again every second.
+                        Timer {
+                            interval: 1000
+                            repeat: true
+                            triggeredOnStart: true
+                            running: panel.visible && (panel.player?.isPlaying ?? false)
+                            onTriggered: panel.player.positionChanged()
+                        }
+
+                        Rectangle {
                             anchors.fill: parent
-                            onClicked: Quickshell.execDetached(["mmsg", "dispatch",
-                                `viewcrossmon,${tag.modelData.index},${bar.modelData.name}`])
+                            anchors.margins: 2
+                            color: root.bg
+
+                            ColumnLayout {
+                                id: sheet
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                spacing: 12
+
+                                RowLayout {
+                                    spacing: 12
+
+                                    // Cover, or a note while there is none.
+                                    Rectangle {
+                                        Layout.preferredWidth: 96
+                                        Layout.preferredHeight: 96
+                                        color: root.surface
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: cover.status !== Image.Ready
+                                            text: "\u{f075a}"
+                                            font.family: "Symbols Nerd Font"
+                                            font.pixelSize: 32
+                                            color: root.border
+                                        }
+                                        Image {
+                                            id: cover
+                                            anchors.fill: parent
+                                            source: panel.player?.trackArtUrl ?? ""
+                                            sourceSize: Qt.size(192, 192)
+                                            fillMode: Image.PreserveAspectCrop
+                                            asynchronous: true
+                                        }
+                                    }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        spacing: 4
+
+                                        Label {
+                                            text: panel.player?.trackTitle ?? ""
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                        Label {
+                                            text: panel.player?.trackArtist ?? ""
+                                            color: root.muted
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                        Label {
+                                            text: panel.player?.trackAlbum ?? ""
+                                            color: root.muted
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                        Item {
+                                            Layout.fillHeight: true
+                                        }
+                                        // Previous, play/pause (the glyph is
+                                        // what a click will do) and next.
+                                        RowLayout {
+                                            spacing: 20
+
+                                            MediaButton {
+                                                glyph: "\u{f04ae}"
+                                                available: panel.player?.canGoPrevious ?? false
+                                                onClicked: panel.player.previous()
+                                            }
+                                            MediaButton {
+                                                glyph: panel.player?.isPlaying ? "\u{f03e4}" : "\u{f040a}"
+                                                available: panel.player?.canTogglePlaying ?? false
+                                                onClicked: panel.player.togglePlaying()
+                                            }
+                                            MediaButton {
+                                                glyph: "\u{f04ad}"
+                                                available: panel.player?.canGoNext ?? false
+                                                onClicked: panel.player.next()
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Timeline; a click jumps to that point of
+                                // the track.
+                                Rectangle {
+                                    id: timeline
+                                    readonly property real length: panel.player?.length ?? 0
+                                    readonly property real position: panel.player?.position ?? 0
+                                    Layout.fillWidth: true
+                                    implicitHeight: 6
+                                    color: root.border
+
+                                    Rectangle {
+                                        width: timeline.length > 0
+                                               ? parent.width * Math.min(1, timeline.position / timeline.length) : 0
+                                        height: parent.height
+                                        color: root.fg
+                                    }
+                                    // Taller than the line so it's easy to hit.
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        anchors.topMargin: -6
+                                        anchors.bottomMargin: -6
+                                        enabled: (panel.player?.canSeek ?? false) && timeline.length > 0
+                                        onClicked: mouse => panel.player.position =
+                                            mouse.x / width * timeline.length
+                                    }
+                                }
+                                RowLayout {
+                                    Label {
+                                        text: root.trackTime(timeline.position)
+                                        color: root.muted
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+                                    Label {
+                                        text: root.trackTime(timeline.length)
+                                        color: root.muted
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // Middle: focused window title, centered on the screen and kept
-            // clear of whichever side is wider.
-            Label {
+            // Middle: the clock, centered on the screen.
+            Block {
                 anchors.centerIn: parent
-                width: Math.min(implicitWidth,
-                                bar.width - 2 * Math.max(left.width, right.width) - 32)
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                text: root.windowTitle
+                onClicked: root.clockShowsDate = !root.clockShowsDate
+
+                Label {
+                    text: Qt.formatDateTime(clock.date,
+                                            root.clockShowsDate ? "ddd dd MMM" : "h:mm AP")
+                }
             }
 
-            // Right: music, volume, mic, keyboard layout, caffeine,
-            // notifications, clock, tray.
+            // Right: volume, mic, keyboard layout, caffeine, notifications
+            // and, on the main monitor, the tray.
             RowLayout {
                 id: right
                 anchors.right: parent.right
-                anchors.rightMargin: 10
+                anchors.rightMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 18
-
-                Label {
-                    readonly property MprisPlayer player: root.music
-                    visible: player !== null
-                    text: player ? `${player.isPlaying ? "▶" : "‖"} ${player.trackArtist} - ${player.trackTitle}` : ""
-                    color: player?.isPlaying ? root.fg : root.muted
-                    Layout.maximumWidth: 400
-                    elide: Text.ElideRight
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: parent.player.togglePlaying()
-                    }
-                }
+                spacing: 6
 
                 // Right click lists the outputs; clicking one switches to it.
                 // A click anywhere else closes the list.
@@ -592,11 +924,11 @@ ShellRoot {
                     id: volume
                     label: "vol"
                     node: Pipewire.defaultAudioSink
-                    onRightClicked: outputs.visible = !outputs.visible
+                    onRightClicked: bar.togglePopup(outputs)
 
                     PopupWindow {
                         id: outputs
-                        // Just below the bar, left edge under the label.
+                        // Just below the bar, left edge under the block.
                         anchor.item: volume
                         anchor.rect.y: bar.height - right.y - volume.y
                         grabFocus: true
@@ -646,53 +978,53 @@ ShellRoot {
                 }
 
                 Volume {
+                    id: mic
                     label: "mic"
                     node: Pipewire.defaultAudioSource
                 }
 
                 // Keyboard layout; a click switches to the next one.
-                Label {
-                    visible: text !== ""
-                    text: root.layoutCodes[root.keyboardLayout] ?? root.keyboardLayout
-                    color: root.muted
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: Quickshell.execDetached(["mmsg", "dispatch", "switch_keyboard_layout"])
+                Block {
+                    visible: root.keyboardLayout !== ""
+                    onClicked: Quickshell.execDetached(["mmsg", "dispatch", "switch_keyboard_layout"])
+
+                    Label {
+                        text: root.layoutCodes[root.keyboardLayout] ?? root.keyboardLayout
+                        color: root.muted
                     }
                 }
 
                 // Shown while caffeine is on; a click turns it off.
-                Label {
+                Block {
                     visible: root.caffeine
-                    text: "awake"
-                    color: root.blue
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.caffeine = false
+                    onClicked: root.caffeine = false
+
+                    Label {
+                        text: "awake"
+                        color: root.blue
                     }
                 }
 
                 // Notification count. Left click lists the history, right
                 // click toggles do not disturb. A click elsewhere closes it.
-                Label {
+                Block {
                     id: notif
                     readonly property int count: root.notificationHistory.length
-                    text: `${root.dnd ? "dnd" : "notif"} ${count}`
-                    color: root.dnd ? root.blue : count > 0 ? root.fg : root.muted
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        onClicked: mouse => {
-                            if (mouse.button === Qt.RightButton)
-                                root.dnd = !root.dnd;
-                            else
-                                history.visible = !history.visible;
-                        }
+                    onClicked: bar.togglePopup(history)
+                    onRightClicked: root.dnd = !root.dnd
+
+                    Label {
+                        text: root.dnd ? "dnd" : "notif"
+                        color: root.dnd ? root.blue : root.muted
+                    }
+                    Label {
+                        text: notif.count
+                        color: root.dnd ? root.blue : notif.count > 0 ? root.fg : root.muted
                     }
 
                     PopupWindow {
                         id: history
-                        // Just below the bar, right edge under the label.
+                        // Just below the bar, right edge under the block.
                         anchor.item: notif
                         anchor.rect.x: notif.width - width
                         anchor.rect.y: bar.height - right.y - notif.y
@@ -788,36 +1120,37 @@ ShellRoot {
                     }
                 }
 
-                Label {
-                    text: Qt.formatDateTime(clock.date, "ddd dd MMM HH:mm")
-                }
+                // System tray, on the main monitor: left click activates,
+                // right click opens the menu.
+                Block {
+                    visible: bar.full && SystemTray.items.values.length > 0
 
-                // System tray: left click activates, right click opens the menu.
-                Repeater {
-                    model: SystemTray.items
+                    Repeater {
+                        model: SystemTray.items
 
-                    Image {
-                        id: trayIcon
-                        required property SystemTrayItem modelData
-                        source: modelData.icon
-                        sourceSize: Qt.size(18, 18)
-                        Layout.preferredWidth: 18
-                        Layout.preferredHeight: 18
+                        Image {
+                            id: trayIcon
+                            required property SystemTrayItem modelData
+                            source: modelData.icon
+                            sourceSize: Qt.size(18, 18)
+                            Layout.preferredWidth: 18
+                            Layout.preferredHeight: 18
 
-                        QsMenuAnchor {
-                            id: menu
-                            menu: trayIcon.modelData.menu
-                            anchor.item: trayIcon
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onClicked: mouse => {
-                                const item = trayIcon.modelData;
-                                if (mouse.button === Qt.LeftButton && !item.onlyMenu)
-                                    item.activate();
-                                else if (item.hasMenu)
-                                    menu.open();
+                            QsMenuAnchor {
+                                id: menu
+                                menu: trayIcon.modelData.menu
+                                anchor.item: trayIcon
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: mouse => {
+                                    const item = trayIcon.modelData;
+                                    if (mouse.button === Qt.LeftButton && !item.onlyMenu)
+                                        item.activate();
+                                    else if (item.hasMenu)
+                                        menu.open();
+                                }
                             }
                         }
                     }

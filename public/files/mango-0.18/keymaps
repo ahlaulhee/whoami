@@ -1,0 +1,660 @@
+#!/usr/bin/python3
+"""keymaps APP: print an app's keybinds as JSON, read from its configuration.
+
+The Quickshell cheatsheet (Keymaps.qml, Super+Shift+/) runs this every time
+it opens. Every app gives the same shape:
+
+    {"app": "mango",
+     "binds": [{"mode": "",
+                "category": "Windows",
+                "keys": [{"mods": ["SUPER", "SHIFT"], "key": "h"}],
+                "label": null,
+                "desc": null,
+                "command": "exchange_client left"}]}
+
+mode is the state of the app the bind works in (foot's search), "" in an app
+without modes.
+keys is the sequence of chords to press, a single one for a plain shortcut,
+none when the source names keys in a way that isn't broken down (zathura's
+manual: "h, k, j, l").
+mods are SUPER, CTRL, ALT and SHIFT. key is the XKB name of the key (Return,
+slash, F2) whatever the app calls it, btn_left, btn_middle or btn_right for a
+mouse button (btn_left-2 for a double click), wheel_up or wheel_down for the
+wheel.
+label is the keys as the app writes them (<leader>sf), given by the apps
+whose binds aren't all single chords: the cheatsheet lists those instead of
+drawing them on the keyboard.
+desc is the description the app stores for the bind, null when it has none.
+"""
+import gzip
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+
+CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+DATA = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
+
+# US layout: the key that types each punctuation character, bare and shifted,
+# and the XKB names of the shifted characters.
+US_KEYS = dict(zip(
+    "-=[]\\;',./`",
+    "minus equal bracketleft bracketright backslash semicolon apostrophe"
+    " comma period slash grave".split(),
+))
+US_SHIFTED = dict(zip('_+{}|:"<>?~!@#$%^&*()', [*US_KEYS.values(), *"1234567890"]))
+XKB_SHIFTED = dict(zip(
+    "underscore plus braceleft braceright bar colon quotedbl less greater"
+    " question asciitilde exclam at numbersign dollar percent asciicircum"
+    " ampersand asterisk parenleft parenright".split(),
+    US_SHIFTED.values(),
+))
+
+
+def chord(mods, key):
+    """A chord whose key may be a punctuation character: it becomes the key
+    that types it, with SHIFT when it takes it."""
+    if key in US_SHIFTED and "SHIFT" not in mods:
+        mods = [*mods, "SHIFT"]
+    return {"mods": mods, "key": US_KEYS.get(key) or US_SHIFTED.get(key) or key}
+
+
+def bind(category, keys, command, mode="", desc=None, label=None):
+    return {
+        "mode": mode, "category": category, "keys": keys, "label": label,
+        "desc": desc, "command": command,
+    }
+
+
+MANGO_BIND = re.compile(r"(bind[a-z]*|mousebind|axisbind)\s*=\s*(.*)")
+
+
+def mango():
+    """bind*=MODS,KEY,DISPATCHER[,ARGS], plus mousebind and axisbind.
+
+    A "## Name" comment starts a category. Mango has no descriptions.
+    """
+    binds = []
+    category = ""
+    for line in (CONFIG / "mango/config.conf").read_text().splitlines():
+        line = line.strip()
+        if line.startswith("## "):
+            category = line[3:].strip()
+            continue
+        match = MANGO_BIND.fullmatch(line)
+        if not match:
+            continue
+        kind, value = match.groups()
+        fields = [field.strip() for field in value.split(",", 3)]
+        if len(fields) < 3:
+            continue
+        mods, key = fields[:2]
+        if kind == "axisbind":
+            # UP and DOWN are wheel directions here, not the arrow keys.
+            key = f"wheel_{key.lower()}"
+        binds.append(bind(
+            category,
+            [chord([] if mods.upper() == "NONE" else mods.upper().split("+"), key)],
+            " ".join(field for field in fields[2:] if field),
+        ))
+    return binds
+
+
+KEW_BIND = re.compile(r"bind\s*=\s*(.+?)\s*,\s*(\w+)\s*(?:,\s*(.*))?")
+KEW_KEYS = {
+    "Space": "space", "Enter": "Return", "Backspace": "BackSpace", "Esc": "Escape",
+    "Left Arrow": "Left", "Right Arrow": "Right", "Up Arrow": "Up", "Down Arrow": "Down",
+    "PgUp": "Page_Up", "PgDn": "Page_Down", "Del": "Delete",
+    "mouseLeft": "btn_left", "mouseMiddle": "btn_middle", "mouseRight": "btn_right",
+    "mouseWheelUp": "wheel_up", "mouseWheelDown": "wheel_down",
+}
+
+
+def kew():
+    """bind = [MOD+]KEY, ACTION[, ARGUMENT] under [key bindings] in kewrc.
+
+    kew writes every default into the file, so it holds the whole keymap,
+    without categories or descriptions.
+    """
+    binds = []
+    section = ""
+    for line in (CONFIG / "kew/kewrc").read_text().splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            section = line
+            continue
+        match = KEW_BIND.fullmatch(line)
+        if section != "[key bindings]" or not match:
+            continue
+        keys, action, argument = match.groups()
+        # kew's entry for a key it doesn't recognize.
+        if keys == "Unknown":
+            continue
+        # The key comes after the last +, unless it is + itself.
+        head, _, key = keys.rpartition("+")
+        if not key:
+            key, head = "+", head.rstrip("+")
+        binds.append(bind(
+            "Key bindings",
+            [chord([mod.upper() for mod in head.split("+") if mod], KEW_KEYS.get(key, key))],
+            " ".join(filter(None, [action, argument])),
+        ))
+    return binds
+
+
+FOOT_DEFAULTS = Path("/etc/xdg/foot/foot.ini")
+# Sections with binds, and the mode each works in.
+FOOT_MODES = {
+    "key-bindings": "normal",
+    "mouse-bindings": "normal",
+    "search-bindings": "search",
+    "url-bindings": "url",
+}
+FOOT_LINE = re.compile(r"(# ?)?([\w-]+)\s*=\s*(.*?)(\s+#.*)?")
+FOOT_MODS = {
+    "Control": "CTRL", "Shift": "SHIFT",
+    "Mod1": "ALT", "Alt": "ALT", "Mod4": "SUPER", "Super": "SUPER",
+}
+FOOT_KEYS = {
+    "BTN_LEFT": "btn_left", "BTN_MIDDLE": "btn_middle", "BTN_RIGHT": "btn_right",
+    "BTN_WHEEL_BACK": "wheel_up", "BTN_WHEEL_FORWARD": "wheel_down",
+}
+
+
+def foot_actions(path, commented):
+    """{(section, action): value} of a foot.ini, in file order.
+
+    The system file lists every default as a "# action=value" comment; the
+    user's own file has them uncommented.
+    """
+    actions = {}
+    section = ""
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            section = line.strip("[]")
+            continue
+        match = FOOT_LINE.fullmatch(line)
+        if section in FOOT_MODES and match and bool(match[1]) == commented:
+            actions[section, match[2]] = match[3]
+    return actions
+
+
+def foot():
+    """ACTION=[MOD+]KEY... under the *-bindings sections of foot.ini.
+
+    The defaults come from the system foot.ini, and the user's file replaces
+    the ones it sets. Several chords can share an action, and none unbinds
+    it. Left out: keypad keys and XF86Copy/XF86Paste, which this keyboard
+    doesn't have, and text-bindings, whose only default is an example. foot
+    has no descriptions; a section is a category.
+    """
+    actions = foot_actions(FOOT_DEFAULTS, commented=True)
+    user = CONFIG / "foot/foot.ini"
+    if user.exists():
+        actions.update(foot_actions(user, commented=False))
+    binds = []
+    for (section, action), value in actions.items():
+        # Not a bind: the modifiers that force a selection.
+        if action == "selection-override-modifiers":
+            continue
+        # pipe-* actions put their [command] before the chords.
+        for keys in re.sub(r"^\[.*\]\s*", "", value).split():
+            *mods, key = keys.split("+")
+            if key == "none" or key.startswith("KP_") or key in ("XF86Copy", "XF86Paste"):
+                continue
+            mods = [FOOT_MODS.get(mod, mod.upper()) for mod in mods]
+            if key in XKB_SHIFTED and "SHIFT" not in mods:
+                mods.append("SHIFT")
+            # BTN_LEFT-2 is a double click.
+            button, dash, clicks = key.partition("-")
+            key = FOOT_KEYS.get(button, button) + dash + clicks
+            binds.append(bind(
+                section, [chord(mods, XKB_SHIFTED.get(key, key))], action, FOOT_MODES[section],
+            ))
+    return binds
+
+
+FISH_KEYS = {
+    "enter": "Return", "tab": "Tab", "escape": "Escape", "backspace": "BackSpace",
+    "delete": "Delete", "insert": "Insert", "home": "Home", "end": "End",
+    "pageup": "Page_Up", "pagedown": "Page_Down",
+    "up": "Up", "down": "Down", "left": "Left", "right": "Right",
+}
+
+
+def fish():
+    """bind [-M MODE] CHORD[,CHORD...] COMMAND, as `bind --user` prints them.
+
+    Those are the binds of config.fish and of the plugins, without fish's
+    own. With the default (emacs) key bindings fish stays in the default
+    mode, so only its binds are kept; with vi key bindings, every mode's.
+    fish has no categories or descriptions.
+    """
+    scheme, *lines = subprocess.run(
+        ["fish", "-ic", "echo $fish_key_bindings; bind --user"],
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True,
+    ).stdout.splitlines()
+    emacs = scheme in ("", "fish_default_key_bindings")
+    binds = []
+    for line in lines:
+        mode = "default"
+        words = shlex.split(line)[1:]
+        while words and words[0].startswith("-") and len(words[0]) > 1:
+            option = words.pop(0)
+            if option in ("-M", "--mode"):
+                mode = words.pop(0)
+            elif option in ("-m", "--sets-mode"):
+                words.pop(0)
+        if not words or emacs and mode != "default":
+            continue
+        keys = []
+        for name in words[0].split(","):
+            *mods, key = name.split("-")
+            key = key.upper() if re.fullmatch(r"f\d+", key) else FISH_KEYS.get(key, key)
+            keys.append(chord([mod.upper() for mod in mods], key))
+        binds.append(bind("bind --user", keys, " ".join(words[1:]), mode))
+    return binds
+
+
+TMUX_FORMAT = "#{key_table}\t#{key_string}\t#{key_prefix}\t#{key_note}\t#{key_command}"
+TMUX_MODS = {"C": "CTRL", "M": "ALT", "S": "SHIFT"}
+TMUX_KEYS = {
+    "Space": "space", "Enter": "Return", "BSpace": "BackSpace",
+    "DC": "Delete", "IC": "Insert",
+    "PPage": "Page_Up", "PgUp": "Page_Up", "NPage": "Page_Down", "PgDn": "Page_Down",
+}
+
+
+def tmux_keys(*options):
+    """[[table, key, prefix, note, command]] for every bind of a tmux server
+    started on a socket of its own, which exits once it has listed them."""
+    with tempfile.TemporaryDirectory() as directory:
+        return [line.split("\t", 4) for line in subprocess.run(
+            ["tmux", "-S", f"{directory}/socket", *options,
+             "start-server", ";", "list-keys", "-F", TMUX_FORMAT],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True,
+        ).stdout.splitlines()]
+
+
+def tmux():
+    """What `tmux list-keys` says after reading tmux.conf.
+
+    Every key table is a mode: prefix holds the keys pressed after the
+    prefix, root the ones that work without it. The binds tmux.conf sets,
+    which a server started without it doesn't have, make one category;
+    tmux's own make the other, and of those only the ones with a note are
+    kept. The note is the description.
+    """
+    defaults = {(table, key, note, command)
+                for table, key, _, note, command in tmux_keys("-f", "/dev/null")}
+    binds = []
+    for table, key, prefix, note, command in tmux_keys():
+        own = (table, key, note, command) not in defaults
+        if not own and not note:
+            continue
+        mods = []
+        while re.match(r"[CMS]-.", key):
+            mods.append(TMUX_MODS[key[0]])
+            key = key[2:]
+        if key == "BTab":
+            mods, key = [*mods, "SHIFT"], "Tab"
+        elif len(key) == 1 and key.isupper():
+            mods, key = [*mods, "SHIFT"], key.lower()
+        # prefix and root first, then the tables of tmux's modes; in each
+        # one the binds of tmux.conf first.
+        binds.append((table not in ("prefix", "root"), table, not own, bind(
+            "tmux.conf" if own else "defaults",
+            [chord(mods, TMUX_KEYS.get(key, key))],
+            command,
+            f"prefix ({prefix})" if table == "prefix" else table,
+            note or None,
+        )))
+    binds.sort(key=lambda entry: entry[:3])
+    return [entry[3] for entry in binds]
+
+
+# Runs under `nvim -u NONE -l`, which is Neovim as a plain Lua interpreter.
+NVIM_RECORDER = r"""
+-- Runs the Neovim config against a stand-in for `vim` that only records
+-- keymaps, then prints them as JSON: nothing gets installed and no plugin
+-- loads. It sees vim.keymap.set, wherever the config calls it from, and the
+-- `keys` of lazy.nvim plugin specs.
+-- Taken before the stand-in goes in: Neovim's own Lua modules look `vim`
+-- up as a global and would get the stand-in. These two are written in C.
+local uv, encode = vim.uv, vim.json.encode
+local config = vim.fn.stdpath("config")
+local maps, source = {}, "init.lua"
+
+-- What the config gets for anything else it asks for. Indexing it or calling
+-- it gives it back; other operations give an empty value.
+local stub
+local meta = {
+  __index = function() return stub end,
+  __newindex = function() end,
+  __call = function() return stub end,
+  __concat = function() return "" end,
+  __tostring = function() return "" end,
+  __lt = function() return false end,
+  __le = function() return false end,
+}
+for _, operator in ipairs({ "__add", "__sub", "__mul", "__div", "__mod", "__unm" }) do
+  meta[operator] = function() return 0 end
+end
+stub = setmetatable({}, meta)
+
+local function record(mode, lhs, rhs, opts)
+  if type(lhs) ~= "string" then return end
+  opts = type(opts) == "table" and opts or {}
+  for _, each in ipairs(type(mode) == "table" and mode or { mode }) do
+    maps[#maps + 1] = {
+      mode = each,
+      lhs = lhs,
+      rhs = type(rhs) == "string" and rhs or nil,
+      desc = type(opts.desc) == "string" and opts.desc or nil,
+      source = source,
+    }
+  end
+end
+
+-- Calls a function of the config. It may fail on what the stub gives it;
+-- the keymaps it set before that stay recorded.
+local function try(fn, ...)
+  local ok, result = pcall(fn, ...)
+  if ok then return result end
+  io.stderr:write(source .. ": " .. tostring(result) .. "\n")
+end
+
+_G.vim = setmetatable({
+  g = {},
+  keymap = setmetatable({ set = record }, meta),
+  api = setmetatable({
+    -- An autocommand runs at once, as if its event had come for buffer 0:
+    -- the ones for LspAttach and the like set keymaps.
+    nvim_create_autocmd = function(_, opts)
+      if type(opts) == "table" and type(opts.callback) == "function" then
+        try(opts.callback, { buf = 0, file = "", match = "", data = { client_id = 0 } })
+      end
+      return 0
+    end,
+  }, meta),
+}, meta)
+-- Globals the config expects from plugins (MiniPick) are stubs too.
+setmetatable(_G, { __index = function() return stub end })
+
+-- A lazy.nvim spec: a plugin, a list of specs, or the import of a directory
+-- of files that return specs. A plugin's keys are keymaps, and its opts,
+-- on_attach, init and config can set more.
+local function plugin(spec)
+  if type(spec) ~= "table" then return end
+  if type(spec.import) == "string" then
+    local directory = spec.import:gsub("%.", "/")
+    local files = {}
+    local entries = uv.fs_scandir(config .. "/lua/" .. directory)
+    for name in function() return entries and uv.fs_scandir_next(entries) end do
+      if name:match("%.lua$") then files[#files + 1] = name end
+    end
+    table.sort(files)
+    for _, name in ipairs(files) do
+      source = directory .. "/" .. name
+      plugin(try(dofile, config .. "/lua/" .. source))
+    end
+    return
+  end
+  if type(spec[1]) ~= "string" then
+    for _, each in ipairs(spec) do plugin(each) end
+    return
+  end
+  for _, each in ipairs(type(spec.dependencies) == "table" and spec.dependencies or {}) do
+    plugin(each)
+  end
+  for _, key in ipairs(type(spec.keys) == "table" and spec.keys or {}) do
+    if type(key) == "table" then record(key.mode or "n", key[1], key[2], key) end
+  end
+  local opts = spec.opts
+  if type(opts) == "function" then opts = try(opts, spec, {}) end
+  if type(opts) == "table" and type(opts.on_attach) == "function" then try(opts.on_attach, 0) end
+  for _, hook in ipairs({ "init", "config" }) do
+    if type(spec[hook]) == "function" then try(spec[hook], spec, opts or {}) end
+  end
+end
+
+-- require loads the config's own modules and gives a stub for the rest,
+-- except lazy, whose setup receives the plugin specs.
+package.path = config .. "/lua/?.lua;" .. config .. "/lua/?/init.lua"
+local load_module = require
+function _G.require(name)
+  if name == "lazy" then
+    return setmetatable({
+      setup = function(spec) plugin(type(spec) == "table" and spec.spec or spec) end,
+    }, meta)
+  end
+  local file = package.searchpath(name, package.path)
+  if not file then return stub end
+  local outer = source
+  source = file:sub(#config + 6)
+  local module = try(load_module, name)
+  source = outer
+  if module == nil then return stub end
+  return module
+end
+
+try(dofile, config .. "/init.lua")
+io.write(encode({
+  leader = vim.g.mapleader or "\\",
+  localleader = vim.g.maplocalleader or "\\",
+  maps = maps,
+}))
+"""
+NVIM_MODES = {
+    "n": "normal", "x": "visual", "v": "visual+select", "s": "select",
+    "o": "operator", "i": "insert", "c": "command", "t": "terminal",
+}
+
+# The <C-x> notation that Neovim, yazi and zathura share.
+VIM_MODS = {"c": "CTRL", "s": "SHIFT", "m": "ALT", "a": "ALT", "d": "SUPER"}
+VIM_KEYS = {
+    "esc": "Escape", "tab": "Tab", "cr": "Return", "enter": "Return", "return": "Return",
+    "space": "space", "bs": "BackSpace", "backspace": "BackSpace",
+    "del": "Delete", "delete": "Delete", "insert": "Insert",
+    "up": "Up", "down": "Down", "left": "Left", "right": "Right",
+    "home": "Home", "end": "End", "pageup": "Page_Up", "pagedown": "Page_Down",
+    "lt": "<", "bar": "|", "bslash": "\\",
+}
+
+
+def vim_chord(key):
+    """The chord of a key in that notation: s, G, <C-s>, <S-Tab>, <Esc>."""
+    mods = []
+    if len(key) > 1:
+        *mods, key = key[1:-1].split("-")
+        mods = [VIM_MODS.get(mod.lower(), mod.upper()) for mod in mods]
+        key = VIM_KEYS.get(key.lower(), key)
+    if key == " ":
+        key = "space"
+    elif len(key) == 1 and key.isupper():
+        mods, key = [*mods, "SHIFT"], key.lower()
+    return chord(mods, key)
+
+
+def vim_keys(lhs, leaders={}):
+    """The chords of keys written one after another: <leader>sf, gD,
+    <Esc><Esc>. leaders gives the keys <leader> and <localleader> stand for."""
+    keys = []
+    for key in re.findall(r"<[^<>]+>|.", lhs):
+        if key[1:-1].lower() in leaders:
+            keys += vim_keys(leaders[key[1:-1].lower()])
+        else:
+            keys.append(vim_chord(key))
+    return keys
+
+
+def nvim():
+    """The keymaps the Neovim config sets, found by running it (see
+    NVIM_RECORDER): its own, without Neovim's or the plugins' defaults.
+
+    A mode of Neovim is a mode, the file that sets a keymap is its category
+    and its desc the description. Most are sequences, so each carries its
+    left-hand side as the label.
+    """
+    result = subprocess.run(
+        ["nvim", "-u", "NONE", "-l", "-"], input=NVIM_RECORDER,
+        capture_output=True, text=True, check=True, timeout=5,
+    )
+    # What the config couldn't do against the stub.
+    sys.stderr.write(result.stderr)
+    data = json.loads(result.stdout)
+    leaders = {"leader": data["leader"], "localleader": data["localleader"]}
+    binds = [
+        bind(
+            item["source"],
+            vim_keys(item["lhs"], leaders),
+            item.get("rhs") or "Lua function",
+            NVIM_MODES.get(item["mode"], item["mode"]),
+            item.get("desc"),
+            item["lhs"],
+        )
+        for item in data["maps"]
+        # <Plug> maps are names for other maps to use, not keys.
+        if not item["lhs"].lower().startswith("<plug>")
+    ]
+    modes = list(NVIM_MODES.values())
+    binds.sort(key=lambda each: modes.index(each["mode"]) if each["mode"] in modes else len(modes))
+    return binds
+
+
+YAZI_PRESET = DATA / "keymaps/yazi-keymap-default.toml"
+
+
+def yazi():
+    """{ on = KEY or [KEY...], run = COMMAND or [COMMAND...], desc = ... }
+    in the keymap of each layer of yazi's keymap.toml.
+
+    yazi keeps its defaults inside the binary, so they are read from a copy
+    of its preset (YAZI_PRESET), to be replaced by hand when yazi is
+    upgraded. The user's keymap.toml goes over it as in yazi: keymap
+    replaces a layer's binds, prepend_keymap and append_keymap go before and
+    after them, and of two binds on the same keys the first one wins. A
+    layer is a mode. The category of a preset bind is the "# Comment" above
+    its group, the layer's name before the first; the user's are under
+    keymap.toml.
+    """
+    text = YAZI_PRESET.read_text()
+    groups, layer = {}, None
+    for line in map(str.strip, text.splitlines()):
+        if match := re.fullmatch(r"\[(\w+)\]", line):
+            layer = group = match[1]
+            groups[layer] = []
+        elif layer and line.startswith("# "):
+            group = line[2:]
+        elif layer and line.startswith("{"):
+            groups[layer].append(group)
+    user = CONFIG / "yazi/keymap.toml"
+    own = tomllib.loads(user.read_text()) if user.exists() else {}
+    binds = []
+    for layer, preset in tomllib.loads(text).items():
+        # The layer's name too for any entry the scan above didn't see.
+        entries = list(zip(groups[layer] + [layer] * len(preset["keymap"]), preset["keymap"]))
+        mine = {
+            field: [("keymap.toml", entry) for entry in entries]
+            for field, entries in own.get(layer, {}).items()
+        }
+        entries = mine.get("keymap", entries)
+        entries = mine.get("prepend_keymap", []) + entries + mine.get("append_keymap", [])
+        seen = set()
+        for category, entry in entries:
+            on = entry["on"] if isinstance(entry["on"], list) else [entry["on"]]
+            run = entry["run"] if isinstance(entry["run"], list) else [entry["run"]]
+            if tuple(on) in seen:
+                continue
+            seen.add(tuple(on))
+            binds.append(bind(
+                category, [vim_chord(key) for key in on], "; ".join(run),
+                layer, entry.get("desc"), " ".join(on),
+            ))
+    return binds
+
+
+# The modes of zathurarc, by the titles their keys have in the manual.
+ZATHURA_MODES = {
+    "normal": "General", "fullscreen": "Fullscreen mode",
+    "presentation": "Presentation mode", "index": "Index mode",
+}
+
+
+def zathura():
+    """map [MODE] KEYS FUNCTION [ARGUMENT] in zathurarc, then zathura's own
+    keys as zathura(1) lists them, the only place they are written down.
+
+    The manual has a title for each mode (and one for the mouse), which is
+    the mode here, and under it entries of some keys and what they do:
+    "h, k, j, l" scroll "to the left, down, up or right". Each entry is one
+    bind with those keys as its label and that text as its description.
+    """
+    binds = []
+    zathurarc = CONFIG / "zathura/zathurarc"
+    for line in zathurarc.read_text().splitlines() if zathurarc.exists() else []:
+        words = line.split()
+        if words[:1] != ["map"]:
+            continue
+        mode = "normal"
+        if words[1:] and words[1].startswith("["):
+            mode = words.pop(1).strip("[]")
+        if len(words) < 3:
+            continue
+        binds.append(bind(
+            "zathurarc", vim_keys(words[1]), " ".join(words[2:]),
+            ZATHURA_MODES.get(mode, mode), None, words[1],
+        ))
+    page = subprocess.run(
+        ["man", "-w", "zathura"], capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    with gzip.open(page, "rt") as manual:
+        lines = manual.read().splitlines()
+    start = lines.index(".SH MOUSE AND KEY BINDINGS") + 1
+    mode, entry = "", None
+    for line in lines[start:]:
+        # roff: \- is a hyphen, \(aq an apostrophe, \fB and \fP change font.
+        line = re.sub(r"\\f.", "", line.replace("\\-", "-").replace("\\(aq", "'"))
+        if line.startswith(".SH"):
+            break
+        if line.startswith(".B "):
+            # An entry: its keys in bold, then lines of text until the next
+            # macro.
+            entry = bind("zathura(1)", [], "", mode, "", line[3:])
+            binds.append(entry)
+        elif line.startswith("."):
+            entry = None
+        elif entry:
+            entry["desc"] = f"{entry['desc']} {line}".strip()
+        else:
+            mode = line
+    return binds
+
+
+EXTRACTORS = {
+    "mango": mango, "kew": kew, "foot": foot, "fish": fish, "tmux": tmux, "nvim": nvim,
+    "yazi": yazi, "zathura": zathura,
+}
+
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] not in EXTRACTORS:
+        sys.exit(f"usage: keymaps {{{'|'.join(EXTRACTORS)}}}")
+    app = sys.argv[1]
+    try:
+        binds = EXTRACTORS[app]()
+    except (OSError, ValueError) as error:
+        sys.exit(f"keymaps {app}: {error}")
+    except subprocess.SubprocessError as error:
+        sys.exit(f"keymaps {app}: {error}\n{error.stderr or ''}")
+    json.dump({"app": app, "binds": binds}, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()
